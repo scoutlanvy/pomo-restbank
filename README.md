@@ -1,0 +1,91 @@
+# Pomo Restbank
+
+**Build focus. Bank your breaks.**
+
+A Windows study timer with a shared Rust sync server. Complete Pomodoro targets to earn a break balance, then use that balance when you choose. The native desktop client uses Tauri 2; timer rules, storage, network communication, and audio run in Rust. The UI uses TypeScript and CSS.
+
+Pomo Restbank is a new implementation of FokusSaldo. This repository does not replace the Python application or access its existing databases. Android, public hosting/TLS, offline editing, and legacy data import are not included in this first version.
+
+[Panduan Bahasa Indonesia](README.id.md)
+
+## Requirements
+
+To run: Windows 10/11 and Microsoft Edge WebView2 Runtime. To build: stable Rust with the MSVC toolchain, Visual Studio C++ Build Tools (Desktop development with C++ and a Windows SDK), and Node.js 22.12 or newer. See [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
+
+## Build and run
+
+From the repository root, in PowerShell:
+
+```powershell
+npm.cmd --prefix desktop ci
+.\scripts\Build.ps1
+.\dist\Start-PomoRestbank.ps1
+```
+
+The build creates a release client, a server, and an NSIS installer in `dist/`. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. If PowerShell blocks scripts, use `powershell -ExecutionPolicy Bypass -File .\dist\Start-PomoRestbank.ps1` for this invocation.
+
+For two clients on this computer:
+
+```powershell
+.\dist\Start-PomoRestbank.ps1 -Profile first
+.\dist\Start-PomoRestbank.ps1 -Profile second
+```
+
+For short preview sessions and separate data:
+
+```powershell
+.\dist\Start-PomoRestbank.ps1 -Preview -Profile first
+.\dist\Start-PomoRestbank.ps1 -Preview -Profile second
+```
+
+You can also start the executables yourself:
+
+```powershell
+.\dist\pomo-restbank-server.exe
+.\dist\pomo-restbank.exe --profile first
+```
+
+Open **Settings → Your sync connection**, enter `ws://127.0.0.1:4317/v1/ws`, and paste the contents of `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Preview uses port 4318 and `preview-server\token.txt`. The server prints the token file location, never the token itself. The client stores the token in its profile's `connection.json`; treat that file as private.
+
+To stop a server launched by the helper, identify its process by executable path/PID and stop that specific process in Task Manager. A server started directly in PowerShell can be stopped with Ctrl+C. Closing clients leaves the server running.
+
+## Timer behavior
+
+- **Manual:** choose 00:00:01–99:59:59, Start, Pause, Resume, or Reset. Only a completed timer records its original duration. Reset discards unfinished Manual progress.
+- **Pomodoro:** 25-minute targets earn 5, 5, 5, then 15 minutes of break credit, repeating. Focus completion saves history and rewards atomically before sounding the alarm. Stop Alarm opens explicit Continue Focus / break choices; no next phase starts automatically.
+- **Reset focus:** elapsed focus is saved once under its subject and carried toward the next target. Completing the remaining target earns one reward. Reset after a completion never repeats its record or reward.
+- **Breaks:** use the balance or choose a shorter duration. Only running break seconds cost balance. Skip preserves unused credit. A break taken during paused focus restores that same focus paused after acknowledgement or Skip. An idle break normally returns to idle.
+- **Progress scope:** Shared across subjects (default) and Per subject retain independent progress. Switching never copies or merges progress. Balance and reward cycle stay shared.
+- **Subjects:** add via +; remove via trash or right-click any subject in the popup. Umum is protected. Confirmation is required; removing a subject preserves history and progress.
+- **History:** Summary by subject and the 30 most recent sessions, displayed in Asia/Jakarta. Visibility starts hidden on each launch.
+- **Sound:** tick On/Off and 0–400% tick volume, independent of the alarm. Preferences are synced; theme and UI state are local. Space pauses/resumes countdowns, ignores inputs and dialogs, and never starts a timer or dismisses an alarm.
+
+## Sync, disconnection, and recovery
+
+One server hosts one private shared timer. Every client can control it while connected. Commands use unique IDs and optimistic revisions; a stale command is rejected with the latest state. Retrying an unacknowledged command uses the same ID and cannot duplicate history, reward, or debit.
+
+Disconnected clients show an estimate and disable changes. There are no offline command queues. After reconnection, they load authoritative state; **Retry same command** resolves an unacknowledged operation. All clients connected at completion ring; Stop Alarm stops all of them. New connections do not replay old alarms.
+
+The timer runs while the server runs, even with zero clients. On server restart, saved countdowns restore paused. Time while the server is stopped or its computer is suspended is not counted. A detected scheduling interruption over three seconds pauses the timer instead of catching up. Storage failure pauses progress until Retry; a failed transaction does not advance the durable countdown.
+
+For LAN, run the server with `--listen 0.0.0.0:4317` and connect the other computer to `ws://SERVER_LAN_IP:4317/v1/ws` using the same token. Bind defaults to loopback. LAN mode is for a trusted private network; public exposure and TLS deployment are outside this release. A firewall rule may be needed on the server computer. Do not expose the port to the internet.
+
+## Data and development
+
+Normal server: `%LOCALAPPDATA%\PomoRestbank\server\restbank.sqlite3`.
+Preview server: `%LOCALAPPDATA%\PomoRestbank\preview-server\restbank.sqlite3`.
+Clients: `%LOCALAPPDATA%\PomoRestbank\clients\PROFILE\`, or `preview-clients\PROFILE\`.
+Each profile holds connection configuration, a snapshot cache, and its own WebView storage. Use different profiles for simultaneous clients. Back up the server directory with the server stopped. Client cache is not the authoritative database.
+
+Both executables accept `--data-dir PATH` for isolated testing. Client profiles accept letters, digits, `_`, and `-`. A file lock prevents two servers from using one data directory or two clients from using one profile.
+
+```powershell
+$env:CARGO_TARGET_DIR = Join-Path $env:TEMP 'pomo-restbank-dev-build'
+npm.cmd --prefix desktop run build
+cargo test --workspace
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+npm.cmd --prefix desktop test
+```
+
+UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.

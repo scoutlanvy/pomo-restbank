@@ -1,0 +1,21 @@
+[package]
+name = "pomo-restbank-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+restbank-domain.workspace = true
+restbank-protocol.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+axum.workspace = true
+sqlx.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+futures-util.workspace = true
+fs2 = "0.4"
+[dev-dependencies]
+tempfile.workspace = true
+tokio-tungstenite.workspace = true

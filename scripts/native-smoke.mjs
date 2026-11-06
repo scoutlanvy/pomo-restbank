@@ -1,0 +1,359 @@
+// Windows integration test: real server, real Rust IPC, and two isolated WebView2 clients.
+import { spawn, execFileSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
+import { randomUUID } from "node:crypto";
+import { createServer } from "node:net";
+import assert from "node:assert/strict";
+const require = createRequire(
+  new URL("../desktop/package.json", import.meta.url),
+);
+const { chromium } = require("@playwright/test");
+const argument = process.argv.indexOf("--build-dir");
+const build = resolve(
+  argument < 0
+    ? join(tmpdir(), "pomo-restbank-build-20261107", "release")
+    : process.argv[argument + 1],
+);
+const root = await mkdtemp(join(tmpdir(), "pomo-restbank-native-"));
+const children = [];
+const browsers = [];
+const report = { checks: [], build, artifacts: root };
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+async function until(fn, label, timeout = 20000) {
+  const end = Date.now() + timeout;
+  let last;
+  while (Date.now() < end) {
+    try {
+      const value = await fn();
+      if (value) return value;
+    } catch (e) {
+      last = e;
+    }
+    await wait(100);
+  }
+  throw new Error(`${label}: ${last?.message ?? "timeout"}`);
+}
+async function port() {
+  const s = createServer();
+  await new Promise((r) => s.listen(0, "127.0.0.1", r));
+  const p = s.address().port;
+  await new Promise((r) => s.close(r));
+  return p;
+}
+function launch(exe, args, env = {}) {
+  const child = spawn(join(build, exe), args, {
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, ...env },
+  });
+  children.push(child);
+  child.stderr.on("data", (chunk) => process.stderr.write(chunk));
+  return child;
+}
+async function view(page) {
+  return page.evaluate(() => window.__TAURI_INTERNALS__.invoke("get_view"));
+}
+async function invoke(page, command) {
+  return page.evaluate(
+    (command) => window.__TAURI_INTERNALS__.invoke("send_command", { command }),
+    command,
+  );
+}
+async function idleCommand(page, command) {
+  const before = (await view(page)).snapshot.state.revision;
+  await invoke(page, command);
+  return until(async () => {
+    const v = await view(page);
+    if (v.error) throw new Error(v.error);
+    return !v.pending && v.snapshot.state.revision > before ? v : null;
+  }, command.type);
+}
+async function status(page, status) {
+  return until(async () => {
+    const v = await view(page);
+    return v.snapshot?.state.status === status && !v.pending ? v : null;
+  }, `status ${status}`);
+}
+async function closeClient(item) {
+  try {
+    await item.page.evaluate(() =>
+      window.__TAURI_INTERNALS__.invoke("plugin:window|close", {
+        label: "main",
+      }),
+    );
+  } catch (error) {
+    if (!String(error).includes("has been closed")) throw error;
+  }
+  await until(
+    () => item.process.exitCode !== null || item.process.signalCode !== null,
+    "client closes",
+    5000,
+  );
+}
+async function launchClient(name, endpoint, token, configureInUi = false) {
+  const dir = join(root, name);
+  await mkdir(dir, { recursive: true });
+  const configPath = join(dir, "connection.json");
+  let config;
+  try {
+    config = JSON.parse(await readFile(configPath, "utf8"));
+  } catch {
+    config = { endpoint, token, client_id: randomUUID() };
+  }
+  if (!configureInUi) await writeFile(configPath, JSON.stringify(config));
+  const debugPort = await port();
+  const child = launch(
+    "pomo-restbank.exe",
+    ["--preview", "--profile", name, "--data-dir", dir],
+    {
+      WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
+    },
+  );
+  await until(async () => {
+    const r = await fetch(`http://127.0.0.1:${debugPort}/json/version`);
+    return r.ok;
+  }, "WebView debug endpoint");
+  const browser = await chromium.connectOverCDP(
+    `http://127.0.0.1:${debugPort}`,
+  );
+  browsers.push(browser);
+  const page = await until(
+    () => browser.contexts()[0]?.pages()[0],
+    "WebView page",
+  );
+  if (configureInUi) {
+    await page.getByRole("button", { name: "Connect your timer" }).click();
+    await page.getByRole("textbox", { name: "Server address" }).fill(endpoint);
+    await page.getByLabel("Access token").fill(token);
+    await page.getByRole("button", { name: "Save and connect" }).click();
+  }
+  await until(async () => {
+    const v = await view(page);
+    return v.connection === "connected";
+  }, "native connection");
+  await page.locator("#primary").waitFor();
+  return { page, process: child };
+}
+let server;
+try {
+  const serverPort = await port();
+  const address = `127.0.0.1:${serverPort}`;
+  const endpoint = `ws://${address}/v1/ws`;
+  const startServer = () =>
+    launch("pomo-restbank-server.exe", [
+      "--preview",
+      "--listen",
+      address,
+      "--data-dir",
+      join(root, "server"),
+    ]);
+  server = startServer();
+  await until(async () => {
+    const r = await fetch(`http://${address}/health`);
+    return r.ok;
+  }, "server ready");
+  const token = await readFile(join(root, "server", "token.txt"), "utf8");
+  let a = await launchClient("first", endpoint, token, true),
+    b = await launchClient("second", endpoint, token);
+  const processes = JSON.parse(
+    execFileSync(
+      "powershell.exe",
+      [
+        "-NoProfile",
+        "-Command",
+        "Get-CimInstance Win32_Process | Select-Object ProcessId,ParentProcessId,WorkingSetSize,PrivatePageCount,Name | ConvertTo-Json -Compress",
+      ],
+      { windowsHide: true, encoding: "utf8" },
+    ),
+  );
+  const memory = (pid) => {
+    const ids = new Set([pid]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const p of processes)
+        if (ids.has(p.ParentProcessId) && !ids.has(p.ProcessId)) {
+          ids.add(p.ProcessId);
+          changed = true;
+        }
+    }
+    const matched = processes.filter((p) => ids.has(p.ProcessId));
+    return {
+      processes: matched.length,
+      working_set_mib:
+        matched.reduce((sum, p) => sum + Number(p.WorkingSetSize), 0) / 1048576,
+      private_commit_mib:
+        matched.reduce((sum, p) => sum + Number(p.PrivatePageCount), 0) /
+        1048576,
+    };
+  };
+  report.memory = {
+    first_client_including_webview2: memory(a.process.pid),
+    second_client_including_webview2: memory(b.process.pid),
+    server: memory(server.pid),
+  };
+  report.checks.push(
+    "native Settings saves connection/token; two clients authenticate and render",
+  );
+  await a.page.getByRole("button", { name: "Start focus" }).click();
+  await status(a.page, "running");
+  await status(b.page, "running");
+  await until(
+    async () =>
+      (await view(b.page)).snapshot.state.timer.remaining_seconds <= 8,
+    "two committed focus seconds",
+  );
+  await b.page.getByRole("button", { name: "Pause", exact: true }).click();
+  const paused = await status(a.page, "paused");
+  await status(b.page, "paused");
+  const remainder = paused.snapshot.state.timer.remaining_seconds;
+  await wait(1200);
+  assert.equal(
+    (await view(a.page)).snapshot.state.timer.remaining_seconds,
+    remainder,
+  );
+  report.checks.push(
+    "Start on first / Pause on second sync; pause does not consume time",
+  );
+  await a.page.getByRole("button", { name: "Resume", exact: true }).click();
+  await status(b.page, "running");
+  await b.page.getByRole("button", { name: "Reset", exact: true }).click();
+  await status(a.page, "idle");
+  await status(b.page, "idle");
+  assert.ok((await view(a.page)).snapshot.state.shared_progress >= 2);
+  await a.page.getByRole("button", { name: "Show History" }).click();
+  await a.page.locator(".history-row").first().waitFor();
+  report.checks.push(
+    "Reset records partial focus and refreshes native history",
+  );
+  await a.page.getByRole("button", { name: "Add subject" }).click();
+  await a.page.getByRole("textbox", { name: "Subject name" }).fill("Algebra");
+  await a.page
+    .getByRole("button", { name: "Add subject", exact: true })
+    .last()
+    .click();
+  await until(
+    async () => (await view(b.page)).snapshot.state.subject === "Algebra",
+    "new subject sync",
+  );
+  await idleCommand(a.page, {
+    type: "save_settings",
+    focus_scope: "per_subject",
+    tick_sound: false,
+    tick_volume: 120,
+  });
+  await until(
+    async () =>
+      (await view(b.page)).snapshot.state.settings.tick_volume === 120,
+    "settings sync",
+  );
+  report.checks.push(
+    "subject and preferences synchronize across native clients",
+  );
+  await idleCommand(a.page, {
+    type: "select",
+    mode: "manual",
+    subject: "Algebra",
+  });
+  await idleCommand(a.page, { type: "start", seconds: 60 });
+  await status(b.page, "running");
+  await closeClient(a);
+  await closeClient(b);
+  await wait(2200);
+  a = await launchClient("first", endpoint, token);
+  const continued = await status(a.page, "running");
+  assert.ok(continued.snapshot.state.timer.remaining_seconds < 60);
+  b = await launchClient("second", endpoint, token);
+  report.checks.push("timer continues with every client window closed");
+  await idleCommand(a.page, { type: "reset" });
+  await idleCommand(a.page, {
+    type: "select",
+    mode: "pomodoro",
+    subject: "Algebra",
+  });
+  await idleCommand(a.page, { type: "start", seconds: 0 });
+  await status(a.page, "alarm");
+  await status(b.page, "alarm");
+  assert.equal((await view(a.page)).snapshot.state.balance_seconds, 5);
+  await b.page.getByRole("button", { name: "Stop Alarm", exact: true }).click();
+  await status(a.page, "choice");
+  await status(b.page, "choice");
+  report.checks.push(
+    "completion grants one reward and Stop Alarm syncs across windows",
+  );
+  await idleCommand(a.page, { type: "start_break", seconds: 2 });
+  await status(b.page, "running");
+  await status(a.page, "alarm");
+  await status(b.page, "alarm");
+  await b.page.getByRole("button", { name: "Stop Alarm", exact: true }).click();
+  await status(a.page, "choice");
+  assert.equal((await view(a.page)).snapshot.state.balance_seconds, 3);
+  await idleCommand(a.page, { type: "reset" });
+  await a.page.screenshot({
+    path: join(root, "native-light.png"),
+    fullPage: true,
+  });
+  await a.page.getByRole("button", { name: "Toggle color theme" }).click();
+  await a.page.screenshot({
+    path: join(root, "native-dark.png"),
+    fullPage: true,
+  });
+  report.checks.push(
+    "break debit and alarm acknowledgement preserve exact remaining balance",
+  );
+  await idleCommand(a.page, { type: "start", seconds: 0 });
+  await status(b.page, "running");
+  server.kill();
+  await until(
+    () => server.exitCode !== null || server.signalCode !== null,
+    "server stopped",
+  );
+  await until(
+    async () => (await view(a.page)).connection !== "connected",
+    "disconnect detected",
+    20000,
+  );
+  assert.equal(await a.page.locator("#primary").isDisabled(), true);
+  report.checks.push("server loss disables native controls");
+  server = startServer();
+  await until(async () => {
+    const r = await fetch(`http://${address}/health`);
+    return r.ok;
+  }, "server restart");
+  await until(
+    async () => (await view(a.page)).connection === "connected",
+    "reconnect",
+  );
+  await status(a.page, "paused");
+  await status(b.page, "paused");
+  report.checks.push(
+    "server restart restores paused and both native clients reconnect",
+  );
+  await closeClient(a);
+  await closeClient(b);
+  report.ok = true;
+} catch (error) {
+  report.ok = false;
+  report.error = error.stack;
+  process.exitCode = 1;
+} finally {
+  for (const browser of browsers)
+    try {
+      await browser.close();
+    } catch {}
+  for (const child of children) if (child.exitCode === null) child.kill();
+  await wait(500);
+  // Retain screenshots/report, but remove our own temporary databases and tokens.
+  for (const name of ["first", "second", "server"])
+    await rm(join(root, name), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 300,
+    }).catch(() => {});
+  await writeFile(join(root, "report.json"), JSON.stringify(report, null, 2));
+  console.log(JSON.stringify(report, null, 2));
+}

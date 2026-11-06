@@ -1,0 +1,29 @@
+[package]
+name = "pomo-restbank"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+build = "build.rs"
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+[dependencies]
+tauri = { version = "2", features = [] }
+serde.workspace = true
+serde_json.workspace = true
+restbank-domain.workspace = true
+restbank-protocol.workspace = true
+tokio.workspace = true
+tokio-tungstenite.workspace = true
+futures-util.workspace = true
+uuid.workspace = true
+sqlx.workspace = true
+anyhow.workspace = true
+tempfile.workspace = true
+hound = "3.5"
+fs2 = "0.4"
+url = "2"
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Media_Audio"] }

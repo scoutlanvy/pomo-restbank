@@ -1,0 +1,14 @@
+/target/
+/dist/
+**/node_modules/
+/desktop/dist/
+**/gen/
+*.sqlite3*
+*.log
+.env
+.env.*
+token.txt
+connection.json
+.venv/
+__pycache__/
+.pytest_cache/
