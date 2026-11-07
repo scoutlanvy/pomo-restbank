@@ -1,6 +1,7 @@
 import "./style.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { WindowLayout } from "./window-layout";
 
 type Mode = "manual" | "pomodoro";
 type Status = "idle" | "running" | "paused" | "choice" | "alarm";
@@ -57,6 +58,10 @@ type History = { type: "history"; sessions: Session[]; summary: Summary[] };
 type Command = { type: string; [key: string]: string | number | boolean };
 const icon = (name: string) => {
   const paths: Record<string, string> = {
+    compact:
+      '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9Z"/>',
+    expand: '<path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>',
+    chevron: '<path d="m6 9 6 6 6-6"/>',
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
     settings:
       '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/>',
@@ -107,6 +112,10 @@ let view: View = {
 };
 let history: History | null = null;
 let historyVisible = false;
+let compact = false;
+let compactDetails = false;
+let layoutChanging = false;
+const windowLayout = new WindowLayout();
 let historyTab = "recent";
 let localError: string | null = null;
 let manual = [0, 0, 0];
@@ -134,10 +143,69 @@ const historyDateFormat = new Intl.DateTimeFormat("en-GB", {
   minute: "2-digit",
 });
 const root = document.querySelector<HTMLDivElement>("#app")!;
-root.innerHTML = `<header class="topbar"><a class="brand" href="#" aria-label="Pomo Restbank home"><span class="brandmark">${icon("cup")}</span><span>Pomo <strong>Restbank</strong></span></a><div class="header-actions"><button class="icon-button" id="theme" aria-label="Toggle color theme">${icon("sun")}</button><button class="icon-button" id="settings" aria-label="Open settings">${icon("settings")}</button></div></header><main><div id="banner" role="status" aria-live="polite"></div><div id="workspace"></div></main><footer><span>Build focus. Bank your breaks.</span><span id="profile-label"></span></footer><dialog id="modal"><div id="modal-content"></div></dialog>`;
+root.innerHTML = `<header class="topbar"><a class="brand" href="#" aria-label="Pomo Restbank home"><span class="brandmark">${icon("cup")}</span><span>Pomo <strong>Restbank</strong></span></a><div class="header-actions"><button class="icon-button" id="compact-toggle" disabled aria-label="Enter compact mode" title="Compact mode">${icon("compact")}</button><button class="icon-button" id="theme" aria-label="Toggle color theme">${icon("sun")}</button><button class="icon-button" id="settings" aria-label="Open settings">${icon("settings")}</button></div></header><main><div id="banner" role="status" aria-live="polite"></div><div id="workspace"></div></main><footer><span>Build focus. Bank your breaks.</span><span id="profile-label"></span></footer><dialog id="modal"><div id="modal-content"></div></dialog>`;
 const workspace = document.querySelector<HTMLDivElement>("#workspace")!;
 const modal = document.querySelector<HTMLDialogElement>("#modal")!;
 const modalContent = document.querySelector<HTMLDivElement>("#modal-content")!;
+const headerActions = document.querySelector<HTMLElement>(".header-actions")!;
+document
+  .querySelector("#compact-toggle")!
+  .addEventListener("click", () => changeLayout(!compact));
+async function changeLayout(
+  nextCompact: boolean,
+  details = false,
+  showHistory = false,
+) {
+  if (layoutChanging || (nextCompact && !view.snapshot)) return;
+  layoutChanging = true;
+  const focused = document.activeElement as HTMLElement | null;
+  syncLayoutButtons();
+  if (modal.open) modal.close();
+  workspace
+    .querySelectorAll<HTMLElement>(":popover-open")
+    .forEach((p) => p.hidePopover());
+  try {
+    await windowLayout.change(nextCompact, details);
+    compact = nextCompact;
+    compactDetails = nextCompact && details;
+    document.documentElement.dataset.layout = compact ? "compact" : "full";
+    document.documentElement.dataset.details = String(compactDetails);
+    const destination = compact
+      ? workspace.querySelector(".section-top")
+      : document.querySelector(".topbar");
+    destination?.append(headerActions);
+    if (showHistory) {
+      historyVisible = true;
+      if (connected()) loadHistory();
+    }
+    render();
+  } catch (error) {
+    showError(`Could not change the window layout: ${String(error)}`);
+  } finally {
+    layoutChanging = false;
+    syncLayoutButtons();
+    if (focused?.isConnected && focused.getClientRects().length)
+      focused.focus();
+    else document.querySelector<HTMLButtonElement>("#compact-toggle")!.focus();
+  }
+}
+function syncLayoutButtons() {
+  const toggle = document.querySelector<HTMLButtonElement>("#compact-toggle")!;
+  toggle.disabled = layoutChanging || !view.snapshot;
+  toggle.setAttribute(
+    "aria-label",
+    compact ? "Return to full view" : "Enter compact mode",
+  );
+  toggle.title = compact ? "Full view" : "Compact mode";
+  setMarkup(toggle, icon(compact ? "expand" : "compact"));
+  document
+    .querySelectorAll<HTMLButtonElement>(
+      "#compact-detail-toggle, #full-view, #compact-history",
+    )
+    .forEach((button) => {
+      button.disabled = layoutChanging;
+    });
+}
 let theme =
   localStorage.getItem("restbank:theme") ??
   (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
@@ -345,7 +413,7 @@ function syncDialogControls() {
 function buildWorkspace() {
   renderedSubjects = "";
   renderedHistory = undefined;
-  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong id="balance"></strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong><span id="focus-progress"></span> <small id="focus-total"></small></strong></div></div></div><p class="scope-note"></p><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">Choose duration</button></div><div class="panel-bottom"><button id="history-toggle" class="text-button"></button><button id="timer-settings" class="text-button">${icon("settings")}Settings</button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
+  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong id="balance"></strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong><span id="focus-progress"></span> <small id="focus-total"></small></strong></div></div></div><progress class="compact-target-progress compact-only" aria-label="Focus target progress" max="1" value="0"></progress><p class="scope-note"></p><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">Choose duration</button></div><div class="panel-bottom"><button id="compact-history" class="text-button compact-only">${icon("history")}History</button><button id="full-view" class="text-button compact-only">${icon("expand")}Full view</button><button id="history-toggle" class="text-button"></button><button id="timer-settings" class="text-button">${icon("settings")}Settings</button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
   workspace
     .querySelector("#connection-status")!
     .addEventListener("click", () => openSettings(true));
@@ -366,6 +434,15 @@ function buildWorkspace() {
   workspace
     .querySelector("#retry-pending")!
     .addEventListener("click", () => call("retry_pending"));
+  workspace
+    .querySelector("#compact-detail-toggle")!
+    .addEventListener("click", () => changeLayout(true, !compactDetails));
+  workspace
+    .querySelector("#full-view")!
+    .addEventListener("click", () => changeLayout(false));
+  workspace
+    .querySelector("#compact-history")!
+    .addEventListener("click", () => changeLayout(false, false, true));
   setupSubjects();
   setupDuration();
   workspace.querySelector("#primary")!.addEventListener("click", primary);
@@ -403,6 +480,7 @@ function buildWorkspace() {
   });
 }
 function render() {
+  syncLayoutButtons();
   renderBanner();
   setText(document.querySelector("#profile-label"), `Profile: ${view.profile}`);
   const s = view.snapshot?.state;
@@ -463,6 +541,56 @@ function render() {
               ? "Manual session"
               : `Focus session ${s.cycle_position + 1} of 4`;
   setText(workspace.querySelector(".section-top .eyebrow"), title);
+  setText(
+    workspace.querySelector(".compact-phase"),
+    s.status === "alarm"
+      ? "Complete"
+      : s.status === "choice"
+        ? "Choose next"
+        : `${s.timer?.phase === "break" ? "Break" : s.mode === "manual" ? "Manual" : "Focus"}${s.status === "paused" ? " paused" : s.status === "idle" ? " ready" : ""}`,
+  );
+  setText(workspace.querySelector(".compact-subject strong"), s.subject);
+  workspace.querySelector<HTMLElement>(".compact-subject strong")!.title =
+    s.subject;
+  setText(
+    workspace.querySelector(".compact-subject > span"),
+    `${s.mode === "manual" ? "Manual" : `Pomodoro \u00b7 session ${s.cycle_position + 1}/4`}${s.mode === "manual" && idle ? " \u00b7 Edit duration in full view" : ""}`,
+  );
+  setText(
+    workspace.querySelector("#compact-balance"),
+    formatTime(s.balance_seconds),
+  );
+  workspace.querySelector<HTMLProgressElement>(
+    ".compact-target-progress",
+  )!.value = Math.max(0, Math.min(1, progress(s) / s.focus_seconds));
+  workspace
+    .querySelector("#compact-detail-toggle")!
+    .setAttribute("aria-expanded", String(compactDetails));
+  const detailRegion =
+    workspace.querySelector<HTMLElement>("#compact-details")!;
+  // Move existing controls, never duplicate command handlers or timer nodes.
+  for (const selector of compact
+    ? [
+        ".break-actions",
+        ".stat-grid",
+        ".compact-target-progress",
+        ".scope-note",
+        ".panel-bottom",
+      ]
+    : [
+        ".stat-grid",
+        ".compact-target-progress",
+        ".scope-note",
+        ".break-actions",
+        ".panel-bottom",
+      ]) {
+    const element = workspace.querySelector<HTMLElement>(selector)!;
+    if (compact && element.parentElement !== detailRegion)
+      detailRegion.append(element);
+    else if (!compact && element.parentElement === detailRegion)
+      detailRegion.before(element);
+  }
+  detailRegion.hidden = !compact || !compactDetails;
   const connection =
     workspace.querySelector<HTMLButtonElement>("#connection-status")!;
   connection.className = `connection ${view.connection}`;
@@ -557,7 +685,7 @@ function render() {
     `${icon("history")}${historyVisible ? "Hide History" : "Show History"}`,
   );
   workspace.querySelector<HTMLElement>("#history-panel")!.hidden =
-    !historyVisible;
+    compact || !historyVisible;
   if (historyVisible) renderHistory();
   syncDialogControls();
   renderPendingFeedback();

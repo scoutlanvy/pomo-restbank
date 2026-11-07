@@ -198,6 +198,125 @@ try {
   report.checks.push(
     "native Settings saves connection/token; two clients authenticate and render",
   );
+  const geometry = (page) =>
+    page.evaluate(async () => {
+      const api = window.__TAURI_INTERNALS__;
+      const invoke = (name) =>
+        api.invoke(`plugin:window|${name}`, { label: "main" });
+      return {
+        size: await invoke("inner_size"),
+        position: await invoke("outer_position"),
+        maximized: await invoke("is_maximized"),
+        scale: await invoke("scale_factor"),
+        outer: await invoke("outer_size"),
+        monitor: await invoke("current_monitor"),
+      };
+    });
+  const layout = async (page, selector, mode, details) => {
+    await page.locator(selector).click();
+    await until(
+      () =>
+        page.evaluate(
+          ({ mode, details }) =>
+            document.documentElement.dataset.layout === mode &&
+            (details === undefined ||
+              document
+                .querySelector("#compact-detail-toggle")
+                .getAttribute("aria-expanded") === String(details)) &&
+            !document.querySelector("#compact-toggle").disabled,
+          { mode, details },
+        ),
+      "native layout commits",
+    );
+  };
+  const originalBounds = await geometry(a.page);
+  const originalRevision = (await view(a.page)).snapshot.state.revision;
+  await layout(a.page, "#compact-toggle", "compact", false);
+  const compactBounds = await geometry(a.page);
+  report.compact = { originalBounds, compactBounds };
+  assert.ok(
+    Math.abs(compactBounds.size.width / compactBounds.scale - 390) <= 2,
+  );
+  assert.ok(
+    Math.abs(compactBounds.size.height / compactBounds.scale - 560) <= 2,
+  );
+  await a.page.screenshot({
+    path: join(root, "native-compact-light.png"),
+    fullPage: true,
+  });
+  await layout(a.page, "#compact-detail-toggle", "compact", true);
+  report.compact.expandedBounds = await geometry(a.page);
+  await a.page.evaluate(() => document.querySelector("#theme").click());
+  await a.page.screenshot({
+    path: join(root, "native-compact-details-dark.png"),
+    fullPage: true,
+  });
+  assert.equal(await a.page.locator("#break-all").isEnabled(), false); // initial balance is zero
+  assert.equal(
+    await a.page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+    true,
+  );
+  await layout(a.page, "#full-view", "full");
+  const restoredBounds = await geometry(a.page);
+  report.compact.restoredBounds = restoredBounds;
+  const area = restoredBounds.monitor.workArea;
+  const availableWidth =
+    area.size.width - (restoredBounds.outer.width - restoredBounds.size.width);
+  const availableHeight =
+    area.size.height -
+    (restoredBounds.outer.height - restoredBounds.size.height);
+  const expectedSize = {
+    width: Math.min(originalBounds.size.width, availableWidth),
+    height: Math.min(originalBounds.size.height, availableHeight),
+  };
+  assert.deepEqual(restoredBounds.size, expectedSize);
+  assert.deepEqual(restoredBounds.position, {
+    x: Math.max(
+      area.position.x,
+      Math.min(
+        originalBounds.position.x,
+        area.position.x + availableWidth - expectedSize.width,
+      ),
+    ),
+    y: Math.max(
+      area.position.y,
+      Math.min(
+        originalBounds.position.y,
+        area.position.y + availableHeight - expectedSize.height,
+      ),
+    ),
+  });
+  await a.page.getByRole("button", { name: "Toggle color theme" }).click();
+  await a.page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke("plugin:window|maximize", {
+      label: "main",
+    }),
+  );
+  await until(
+    async () => (await geometry(a.page)).maximized,
+    "native maximize",
+  );
+  await layout(a.page, "#compact-toggle", "compact", false);
+  assert.equal((await geometry(a.page)).maximized, false);
+  await layout(a.page, "#compact-toggle", "full");
+  assert.equal((await geometry(a.page)).maximized, true);
+  await a.page.evaluate(() =>
+    window.__TAURI_INTERNALS__.invoke("plugin:window|unmaximize", {
+      label: "main",
+    }),
+  );
+  await until(
+    async () => !(await geometry(a.page)).maximized,
+    "native unmaximize",
+  );
+  assert.deepEqual((await geometry(a.page)).size, restoredBounds.size);
+  assert.equal((await view(a.page)).snapshot.state.revision, originalRevision);
+  await layout(a.page, "#compact-toggle", "compact", false);
+  report.checks.push(
+    "compact native size/detail/restore/maximize works without changing timer revision",
+  );
   await a.page.getByRole("button", { name: "Start focus" }).click();
   await status(a.page, "running");
   await status(b.page, "running");
@@ -224,7 +343,17 @@ try {
   await status(a.page, "idle");
   await status(b.page, "idle");
   assert.ok((await view(a.page)).snapshot.state.shared_progress >= 2);
-  await a.page.getByRole("button", { name: "Show History" }).click();
+  await layout(a.page, "#compact-detail-toggle", "compact", true);
+  await a.page.screenshot({
+    path: join(root, "native-compact-details-after-reset.png"),
+    fullPage: true,
+  });
+  await layout(a.page, "#compact-history", "full");
+  assert.equal(await a.page.locator("#history-panel").isVisible(), true);
+  report.checks.push(
+    "compact Start/Resume/Reset sync with full client; compact History opens full view",
+  );
+
   await a.page.locator(".history-row").first().waitFor();
   report.checks.push(
     "Reset records partial focus and refreshes native history",
@@ -342,6 +471,17 @@ try {
 } finally {
   for (const browser of browsers)
     try {
+      // Close only our isolated test windows normally, including on assertion failures,
+      // so their native audio TempDirs are cleaned before any process fallback.
+      for (const context of browser.contexts())
+        for (const page of context.pages())
+          await page
+            .evaluate(() =>
+              window.__TAURI_INTERNALS__?.invoke("plugin:window|close", {
+                label: "main",
+              }),
+            )
+            .catch(() => {});
       await browser.close();
     } catch {}
   for (const child of children) if (child.exitCode === null) child.kill();

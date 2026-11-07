@@ -892,3 +892,211 @@ dialog[open] {
 .preferences-status .muted {
   margin: 0;
 }
+
+/* Optional compact view shares the timer and command controls with full view. */
+.compact-only {
+  display: none;
+}
+:root[data-layout="compact"] body {
+  min-width: 0;
+  min-height: 100dvh;
+}
+:root[data-layout="compact"] .compact-only {
+  display: block;
+}
+:root[data-layout="compact"] .topbar,
+:root[data-layout="compact"] footer,
+:root[data-layout="compact"] #theme,
+:root[data-layout="compact"] .mode-tabs,
+:root[data-layout="compact"] .subject-row,
+:root[data-layout="compact"] .duration-fields,
+:root[data-layout="compact"] .phase-icon,
+:root[data-layout="compact"] .timer-caption,
+:root[data-layout="compact"] .section-top .eyebrow,
+:root[data-layout="compact"] #history-toggle,
+:root[data-layout="compact"] #timer-settings {
+  display: none;
+}
+:root[data-layout="compact"] main {
+  padding: 10px 14px;
+  max-width: 520px;
+}
+:root[data-layout="compact"] .timer-panel {
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+:root[data-layout="compact"] .section-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-rows: 34px 32px;
+  gap: 0 6px;
+}
+:root[data-layout="compact"] .compact-phase {
+  grid-column: 1;
+  grid-row: 1;
+  font-size: 13px;
+  font-weight: 650;
+  text-align: left;
+}
+:root[data-layout="compact"] #connection-status {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 5px;
+  font-size: 10px;
+}
+:root[data-layout="compact"] .header-actions {
+  grid-column: 3;
+  grid-row: 1;
+  gap: 0;
+}
+:root[data-layout="compact"] .header-actions .icon-button {
+  width: 29px;
+  height: 32px;
+}
+:root[data-layout="compact"] .header-actions svg {
+  width: 18px;
+  height: 18px;
+}
+:root[data-layout="compact"] .panel-heading {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+:root[data-layout="compact"] .compact-subject {
+  margin: 0 0 8px;
+}
+:root[data-layout="compact"] .compact-subject strong {
+  display: block;
+  font-size: 21px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:root[data-layout="compact"] .compact-subject > span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+:root[data-layout="compact"] .timer-face {
+  width: 214px;
+  height: 214px;
+  margin: 8px auto 16px;
+}
+:root[data-layout="compact"] .countdown {
+  font-size: 39px;
+  letter-spacing: -1.5px;
+}
+:root[data-layout="compact"] .estimate {
+  position: absolute;
+  bottom: 38px;
+  max-width: 180px;
+}
+:root[data-layout="compact"] .timer-actions {
+  margin: 0 0 14px;
+  gap: 12px;
+}
+:root[data-layout="compact"] .timer-actions button {
+  padding: 10px;
+  min-height: 44px;
+  font-size: 14px;
+}
+:root[data-layout="compact"] #skip {
+  margin: -6px auto 6px;
+}
+:root[data-layout="compact"] .compact-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding: 10px 0;
+  font-size: 12px;
+  text-align: left;
+}
+.compact-footer strong {
+  margin-left: 5px;
+  font-variant-numeric: tabular-nums;
+}
+#compact-detail-toggle {
+  color: var(--text);
+  min-height: 36px;
+}
+#compact-detail-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+:root[data-layout="compact"] #compact-details {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+:root[data-layout="compact"] .break-actions {
+  margin-bottom: 14px;
+  gap: 8px;
+}
+:root[data-layout="compact"] .break-actions button {
+  flex: 1;
+  min-height: 36px;
+  font-size: 11px;
+}
+:root[data-layout="compact"] .stat-grid {
+  display: block;
+  margin: 0;
+}
+:root[data-layout="compact"] .stat-card:first-child,
+:root[data-layout="compact"] .stat-icon {
+  display: none;
+}
+:root[data-layout="compact"] .stat-card {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+:root[data-layout="compact"] .stat-card > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+:root[data-layout="compact"] .stat-label {
+  margin: 0;
+  font-size: 12px;
+}
+:root[data-layout="compact"] .stat-card strong {
+  font-size: 13px;
+}
+:root[data-layout="compact"] .stat-card small {
+  display: inline;
+  font-size: 11px;
+}
+:root[data-layout="compact"] .compact-target-progress {
+  width: 100%;
+  height: 7px;
+  margin: 10px 0 0;
+  border: 0;
+  border-radius: 5px;
+  accent-color: var(--accent);
+  background: var(--line);
+  overflow: hidden;
+}
+.compact-target-progress::-webkit-progress-bar {
+  background: var(--line);
+}
+.compact-target-progress::-webkit-progress-value {
+  background: var(--accent);
+}
+:root[data-layout="compact"] .scope-note {
+  text-align: left;
+  margin: 8px 0 14px;
+}
+:root[data-layout="compact"] .panel-bottom {
+  padding: 9px 0 0;
+}
+:root[data-layout="compact"] dialog {
+  max-width: calc(100vw - 20px);
+  max-height: calc(100dvh - 20px);
+}
+:root[data-layout="compact"] .notice {
+  overflow-wrap: anywhere;
+}

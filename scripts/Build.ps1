@@ -1,8 +1,9 @@
-param([string]$OutputDirectory)
+param([string]$OutputDirectory, [string]$BuildDirectory)
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path $PSScriptRoot -Parent
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot 'dist' }
-$env:CARGO_TARGET_DIR = Join-Path $env:TEMP 'pomo-restbank-build-20261107'
+if (-not $BuildDirectory) { $BuildDirectory = Join-Path $env:TEMP 'pomo-restbank-build-20261107' }
+$env:CARGO_TARGET_DIR = [IO.Path]::GetFullPath($BuildDirectory)
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 function Copy-BuildExecutable {
     param([string]$Source, [string]$DestinationDirectory)

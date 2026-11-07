@@ -27,7 +27,15 @@
         {
           "identifier": "main-window",
           "windows": ["main"],
-          "permissions": ["core:default", "core:window:allow-close"]
+          "permissions": [
+            "core:default",
+            "core:window:allow-close",
+            "core:window:allow-set-size",
+            "core:window:allow-set-min-size",
+            "core:window:allow-set-position",
+            "core:window:allow-maximize",
+            "core:window:allow-unmaximize"
+          ]
         }
       ],
       "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: http://asset.localhost; connect-src ipc: http://ipc.localhost"

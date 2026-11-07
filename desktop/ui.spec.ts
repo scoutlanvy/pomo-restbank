@@ -1,15 +1,39 @@
 import { test, expect, type Page } from "@playwright/test";
 import { tmpdir } from "node:os";
+import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 async function mock(page: Page, overrides: Record<string, unknown> = {}) {
   await page.route("**/src/main.ts*", async (route) => {
     const response = await route.fetch();
     const original = await response.text();
     const bootstrap = `
-import { mockIPC as _mockIPC } from '/node_modules/@tauri-apps/api/mocks.js';
+import { mockIPC as _mockIPC, mockWindows as _mockWindows } from '/node_modules/@tauri-apps/api/mocks.js';
+_mockWindows('main');
+window._monitor={name:'Test',scaleFactor:1,position:{x:0,y:0},size:{width:1920,height:1080},workArea:{position:{x:0,y:0},size:{width:1920,height:1040}}};
+window._native={maximized:false,position:{x:200,y:100},size:{width:680,height:850},minimum:{width:390,height:560},calls:[],fail:null};
+function nativeIPC(cmd,args){
+ const n=window._native;const key=cmd.split('|')[1];n.calls.push(key);
+ if(n.fail===key){n.fail=null;throw new Error('Simulated window failure');}
+ const val=args?.value?.toJSON?.();const v=val?.Physical??val?.Logical;
+ switch(key){
+ case 'is_maximized':return n.maximized;
+ case 'inner_size':return {...n.size};
+ case 'outer_size':return {width:n.size.width+16,height:n.size.height+39};
+ case 'outer_position':return {...n.position};
+ case 'scale_factor':return window._monitor.scaleFactor;
+ case 'available_monitors':return [window._monitor];
+ case 'current_monitor':return window._monitor;
+ case 'set_size':n.size={...v};return;
+ case 'set_min_size':n.minimum={...v};return;
+ case 'set_position':n.position={...v};return;
+ case 'maximize':n.restore={size:{...n.size},position:{...n.position}};n.maximized=true;n.position={x:0,y:0};n.size={width:1904,height:1001};return;
+ case 'unmaximize':n.maximized=false;if(n.restore){n.size={...n.restore.size};n.position={...n.restore.position};}return;
+ default:throw new Error('Unhandled window mock '+cmd);
+ }
+}
 window._commands=[];window._historyRequests=0;window._retryRequests=0;window._holdCommand=false;
 window._view={snapshot:{state:{revision:1,tick_sequence:0,mode:'pomodoro',subject:'Umum',status:'idle',timer:null,balance_seconds:300,cycle_position:0,shared_progress:0,per_subject_progress:{},settings:{focus_scope:'shared',tick_sound:false,tick_volume:100},subjects:['Umum','English','Programming'],focus_seconds:1500,alarm_id:null},server_time_ms:Date.now(),storage_error:null,preview:false},connection:'connected',endpoint:'ws://127.0.0.1:4317/v1/ws',has_token:true,pending:null,error:null,profile:'test',preview:false,...${JSON.stringify(overrides)}};
-_mockIPC((cmd,args)=>{if(cmd==='get_view')return window._view;if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
+_mockIPC((cmd,args)=>{if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
 window._update=async (partial)=>{window._view={...window._view,...partial};await window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'restbank:view',payload:window._view});};
 `;
     await route.fulfill({ response, body: bootstrap + original });
@@ -714,4 +738,403 @@ test("failed IPC submission unlocks controls without delayed pending feedback", 
   await page.clock.runFor(1000);
   await expect(page.locator("#retry-pending")).toBeHidden();
   await expect(page.locator("#banner")).toContainText("Simulated IPC failure");
+});
+
+async function enterCompact(page: Page) {
+  await page
+    .getByRole("button", { name: "Enter compact mode", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "compact");
+  await page.setViewportSize({ width: 390, height: 560 });
+}
+
+test("compact details share DOM and commands, restore bounds and keep history local", async ({
+  page,
+}) => {
+  await mock(page);
+  await page.evaluate(() => {
+    (window as any)._timerNode = document.querySelector(".timer-face");
+    (window as any)._breakNode = document.querySelector("#break-all");
+  });
+  const original = await page.evaluate(() => ({
+    size: (window as any)._native.size,
+    position: (window as any)._native.position,
+  }));
+  await enterCompact(page);
+  await expect(page.locator(".topbar")).toBeHidden();
+  await expect(page.locator("#compact-details")).toBeHidden();
+  await expect(page.locator("#compact-toggle")).toBeVisible();
+  expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
+    width: 390,
+    height: 560,
+  });
+  expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await page.setViewportSize({ width: 390, height: 740 });
+  await expect(page.locator("#break-all")).toBeVisible();
+  await page.locator("#break-all").click();
+  expect(await page.evaluate(() => (window as any)._commands)).toEqual([
+    { type: "start_break", seconds: 300 },
+  ]);
+  expect(
+    await page.evaluate(
+      () =>
+        document.querySelector(".timer-face") === (window as any)._timerNode &&
+        document.querySelector("#break-all") === (window as any)._breakNode,
+    ),
+  ).toBe(true);
+  await page.locator("#compact-history").click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+  await expect(page.locator("#history-panel")).toBeVisible();
+  expect(
+    await page.evaluate(() => (window as any)._historyRequests),
+  ).toBeGreaterThan(0);
+  expect(
+    await page.evaluate(() => ({
+      size: (window as any)._native.size,
+      position: (window as any)._native.position,
+    })),
+  ).toEqual(original);
+  await page.setViewportSize({ width: 680, height: 850 });
+  await enterCompact(page);
+  await expect(page.locator("#compact-details")).toBeHidden();
+  await page
+    .getByRole("button", { name: "Return to full view", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+  await page.locator("#primary").click();
+  expect(await page.evaluate(() => (window as any)._commands)).toHaveLength(2);
+  await page.reload();
+  await expect(page.locator(".brand")).toBeVisible();
+  await expect(page.locator("#compact-details")).toBeHidden();
+});
+
+test("compact work area clamp, DPI and maximized restore", async ({ page }) => {
+  await mock(page);
+  await page.evaluate(() => {
+    const w = window as any;
+    w._monitor.scaleFactor = 1.5;
+    w._monitor.workArea = {
+      position: { x: -900, y: 40 },
+      size: { width: 600, height: 780 },
+    };
+    w._native.position = { x: -400, y: 650 };
+    w._native.restore = {
+      size: { width: 680, height: 850 },
+      position: { x: -800, y: 90 },
+    };
+    w._native.maximized = true;
+  });
+  await enterCompact(page);
+  const n = await page.evaluate(() => (window as any)._native);
+  expect(n.maximized).toBe(false);
+  expect(n.size).toEqual({ width: 584, height: 741 });
+  expect(n.position).toEqual({ x: -900, y: 40 });
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  expect(await page.evaluate(() => (window as any)._native.size.height)).toBe(
+    741,
+  );
+  await page
+    .getByRole("button", { name: "Return to full view", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+  expect(await page.evaluate(() => (window as any)._native.maximized)).toBe(
+    true,
+  );
+  expect(await page.evaluate(() => (window as any)._native.minimum)).toEqual({
+    width: 584,
+    height: 741,
+  });
+});
+
+test("failed native resize rolls back without committing the view or sending commands", async ({
+  page,
+}) => {
+  await mock(page);
+  await page.evaluate(() => {
+    (window as any)._native.fail = "set_position";
+  });
+  await page.locator("#compact-toggle").click();
+  await expect(page.locator("#banner")).toContainText(
+    "Could not change the window layout",
+  );
+  await expect(page.locator(".brand")).toBeVisible();
+  expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
+    width: 680,
+    height: 850,
+  });
+  await enterCompact(page);
+  await page.evaluate(() => {
+    (window as any)._native.fail = "set_size";
+  });
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#banner")).toContainText(
+    "Simulated window failure",
+  );
+  await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
+  expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
+    width: 390,
+    height: 560,
+  });
+  expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
+  await page.evaluate(() => {
+    (window as any)._native.fail = "set_size";
+  });
+  await page
+    .getByRole("button", { name: "Return to full view", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "compact");
+  await page
+    .getByRole("button", { name: "Return to full view", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+});
+
+test("compact keeps manual draft, closes popovers and returns keyboard focus", async ({
+  page,
+}) => {
+  await mock(page);
+  await page.evaluate(() => {
+    const w = window as any;
+    w._view.snapshot.state.mode = "manual";
+    return w._update({});
+  });
+  await page.getByRole("textbox", { name: "Minutes", exact: true }).fill("12");
+  await page.locator("#subject").click();
+  await expect(page.locator("#subject-popup")).toBeVisible();
+  await enterCompact(page);
+  await expect(page.locator("#subject-popup")).toBeHidden();
+  await expect(page.locator("#compact-toggle")).toBeFocused();
+  await expect(page.locator(".compact-subject")).toContainText(
+    "Edit duration in full view",
+  );
+  await page.locator("#primary").click();
+  expect(await page.evaluate(() => (window as any)._commands)).toEqual([
+    { type: "start", seconds: 720 },
+  ]);
+  await page
+    .getByRole("button", { name: "Return to full view", exact: true })
+    .click();
+  await page.setViewportSize({ width: 680, height: 850 });
+  await expect(
+    page.getByRole("textbox", { name: "Minutes", exact: true }),
+  ).toHaveValue("12");
+});
+
+for (const theme of ["light", "dark"] as const) {
+  for (const reducedMotion of ["reduce", "no-preference"] as const) {
+    test(`compact visual, details, focus and pending ${theme}/${reducedMotion}`, async ({
+      page,
+    }) => {
+      await page.emulateMedia({ reducedMotion });
+      await freezeFeedbackClock(page);
+      await page.evaluate((theme) => {
+        document.documentElement.dataset.theme = theme;
+      }, theme);
+      await enterCompact(page);
+      for (const details of [false, true]) {
+        if (details) {
+          await page.locator("#compact-detail-toggle").click();
+          await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+            "aria-expanded",
+            "true",
+          );
+          await page.setViewportSize({ width: 390, height: 740 });
+        }
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        expect(
+          await page
+            .locator("#compact-detail-toggle")
+            .evaluate((el) => el.getBoundingClientRect().bottom <= innerHeight),
+        ).toBe(true);
+        const before = await page.locator(".timer-face").boundingBox();
+        await page.evaluate(() =>
+          (window as any)._update({ pending: "compact-command" }),
+        );
+        await page.clock.runFor(299);
+        await expect(page.locator("#retry-pending")).toBeHidden();
+        await page.clock.runFor(1);
+        await expect(page.locator("#retry-pending")).toBeVisible();
+        expect(await page.locator(".timer-face").boundingBox()).toEqual(before);
+        expect(
+          await page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth,
+          ),
+        ).toBe(true);
+        await expect(page.locator("#primary")).toHaveCSS("opacity", "1");
+        await page.evaluate(() => (window as any)._update({ pending: null }));
+        const artifacts = join(tmpdir(), "pomo-compact-evidence-c94a");
+        await mkdir(artifacts, { recursive: true });
+        await page.screenshot({
+          path: join(
+            artifacts,
+            `pomo-compact-${theme}-${reducedMotion}-${details}.png`,
+          ),
+          fullPage: true,
+        });
+      }
+      await page.locator("#compact-detail-toggle").focus();
+      await page.keyboard.press("Enter");
+      await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+        "aria-expanded",
+        "false",
+      );
+      await expect(page.locator("#compact-detail-toggle")).toBeFocused();
+      await page.evaluate(() =>
+        (window as any)._update({ connection: "disconnected" }),
+      );
+      await expect(page.locator("#primary")).toBeDisabled();
+      await expect(page.locator("#estimate")).toContainText(
+        "waiting for server",
+      );
+      await page.evaluate(() =>
+        (window as any)._update({ connection: "connected" }),
+      );
+      await expect(page.locator("#primary")).toBeEnabled();
+      await page.locator("#settings").click();
+      await page.locator("#tick-volume").fill("250");
+      await page.evaluate(() =>
+        (window as any)._update({ pending: "settings-command" }),
+      );
+      await page.clock.runFor(300);
+      await expect(page.locator("#retry-settings-pending")).toBeVisible();
+      await expect(page.locator("#tick-volume")).toHaveValue("250");
+      await page.keyboard.press("Escape");
+      await expect(page.locator("#settings")).toBeFocused();
+    });
+  }
+}
+
+test("compact reflects every timer state and preserves break and storage restrictions", async ({
+  page,
+}) => {
+  await mock(page);
+  await enterCompact(page);
+  const states = [
+    ["idle", "focus", "Start focus"],
+    ["running", "focus", "Pause"],
+    ["paused", "focus", "Resume"],
+    ["choice", "focus", "Continue Focus"],
+    ["alarm", "focus", "Stop Alarm"],
+    ["running", "break", "Pause"],
+    ["paused", "break", "Resume"],
+    ["alarm", "break", "Stop Alarm"],
+    ["running", "manual", "Pause"],
+    ["paused", "manual", "Resume"],
+    ["alarm", "manual", "Stop Alarm"],
+  ];
+  for (const [status, phase, label] of states) {
+    await page.evaluate(
+      ({ status, phase }) => {
+        const w = window as any;
+        const s = w._view.snapshot.state;
+        s.status = status;
+        s.mode = phase === "manual" ? "manual" : "pomodoro";
+        s.timer =
+          status === "idle" || status === "choice"
+            ? null
+            : {
+                phase,
+                total_seconds: 1500,
+                remaining_seconds: 1085,
+                subject: "Umum",
+                suspended_focus: null,
+                return_to_choice: false,
+              };
+        s.subject = "A".repeat(100);
+        s.revision++;
+        return w._update({});
+      },
+      { status, phase },
+    );
+    await expect(page.locator("#primary")).toContainText(label);
+    await page.locator("#primary").click();
+    const action = (
+      {
+        idle: "start",
+        running: "pause",
+        paused: "resume",
+        choice: "continue_focus",
+        alarm: "stop_alarm",
+      } as Record<string, string>
+    )[status];
+    expect(
+      await page.evaluate(() => (window as any)._commands.at(-1).type),
+    ).toBe(action);
+    if (phase === "break") {
+      await expect(page.locator("#skip")).toBeVisible();
+      if (status === "running") {
+        await page.locator("#skip").click();
+        expect(
+          await page.evaluate(() => (window as any)._commands.at(-1).type),
+        ).toBe("skip_break");
+      } else await expect(page.locator("#skip")).toBeDisabled();
+    }
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+  }
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#break-all")).toBeDisabled();
+  await page.evaluate(() => {
+    const w = window as any;
+    w._view.snapshot.storage_error = "Test storage error";
+    return w._update({});
+  });
+  await expect(page.locator("#banner")).toContainText("Test storage error");
+  await expect(page.locator("#primary")).toBeDisabled();
+  await page.locator("#retry-storage").click();
+  expect(await page.evaluate(() => (window as any)._commands.at(-1).type)).toBe(
+    "retry_storage",
+  );
+});
+
+test("compact fractional DPI uses integer physical pixels and small screens scroll only vertically", async ({
+  page,
+}) => {
+  await mock(page);
+  await page.evaluate(() => {
+    (window as any)._monitor.scaleFactor = 1.25;
+  });
+  await enterCompact(page);
+  expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
+    width: 488,
+    height: 700,
+  });
+  await page.setViewportSize({ width: 360, height: 400 });
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
+    "aria-expanded",
+    "true",
+  );
+  await page.locator("#full-view").scrollIntoViewIfNeeded();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollHeight > innerHeight,
+    ),
+  ).toBe(true);
+  await page.locator("#full-view").click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
 });

@@ -2,6 +2,18 @@
 
 Verified on Windows, 7 November 2026 (Asia/Jakarta).
 
+## Compact mode verification
+
+The compact-mode update was checked separately on 7 November 2026. The frontend production build, 35 Edge/Playwright tests with mocked Tauri IPC, all 21 Rust behavior/integration/audio tests, rustfmt check, and workspace/all-target Clippy with warnings denied passed. UI coverage includes both themes, reduced motion, pending feedback, command restrictions, draft preservation, resize failures, fractional DPI, work-area clamping, Details and History transitions.
+
+The isolated debug run and the final dist release native smoke run each passed 11 scenarios with two real clients and a real server, including compact resizing, Details, restoration from maximize, and compact/full command synchronization. Native measurements at 200% display scale were 780x1120 physical pixels closed and 780x1480 expanded (390x560 and 390x740 logical pixels). The original full window exceeded the available work area, so restoration correctly reduced its height to keep its frame on screen. Small work areas, negative monitor coordinates and 125%/150% DPI were additionally simulated in UI tests; multiple physical monitors and display hot-plug were not tested. No performance improvement is claimed from these checks.
+
+Release packaging completed with the unchanged running server executable retained by its matching SHA-256 in the existing release cache. The client, NSIS installer, portable ZIP and five-entry checksum manifest were updated; no user server was stopped. The task-owned Cargo build directory was cleaned (6.5 GiB). UI screenshots remain in OS-temp `pomo-compact-evidence-c94a`; passing native reports/screenshots remain in `pomo-restbank-native-CjLafm` (debug) and `pomo-restbank-native-Qe02G4` (dist release). Native test databases and credentials were removed by the smoke script.
+
+Automatic approval review rejected cleanup of the initial failed geometry-assertion run (`pomo-restbank-native-x4vOUQ`), its two audio folders (`pomo-restbank-audio-9aCQO7`, `pomo-restbank-audio-pNqUmV`) and eight obsolete `pomo-compact-*.png` files at the OS-temp root with "blocked by policy". These were retained without an alternative deletion mechanism. The initial assertion expected an off-screen original height; the test now verifies restoration with the required work-area clamping. Existing unrelated temporary artifacts and release caches were preserved.
+
+The measurements and Python-reference results below are historical baseline results; the Python reference was not opened or retested for this update.
+
 ## Checks completed
 
 | Check | Result |
