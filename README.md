@@ -22,7 +22,7 @@ npm.cmd --prefix desktop ci
 .\dist\Start-PomoRestbank.ps1
 ```
 
-The build creates a release client, a server, and an NSIS installer in `dist/`. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. If PowerShell blocks scripts, use `powershell -ExecutionPolicy Bypass -File .\dist\Start-PomoRestbank.ps1` for this invocation.
+The build creates a release client, a server, and an NSIS installer in `dist/`. Identical client/server executables are left in place, so an already-running unchanged server does not block packaging. If an executable has changed and is in use, close the process using that exact file and rerun the build; the script never stops it automatically. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. If PowerShell blocks scripts, use `powershell -ExecutionPolicy Bypass -File .\dist\Start-PomoRestbank.ps1` for this invocation.
 
 For two clients on this computer:
 
@@ -59,6 +59,8 @@ To stop a server launched by the helper, identify its process by executable path
 - **Subjects:** add via +; remove via trash or right-click any subject in the popup. Umum is protected. Confirmation is required; removing a subject preserves history and progress.
 - **History:** Summary by subject and the 30 most recent sessions, displayed in Asia/Jakarta. Visibility starts hidden on each launch.
 - **Sound:** tick On/Off and 0–400% tick volume, independent of the alarm. Preferences are synced; theme and UI state are local. Space pauses/resumes countdowns, ignores inputs and dialogs, and never starts a timer or dismisses an alarm.
+
+Timer updates preserve the field you are editing, keyboard focus, and open subject menus when controls remain available. Manual mode requires a positive duration before Start. Settings retain your draft while controls follow the current timer and connection state. Validation errors remain until you edit the field or retry. Click outside a dialog, use Cancel/Close, or press Escape to dismiss it. Short dialog/menu animations respect your system's reduced-motion preference. Visible History refreshes after reconnection. Commands lock controls immediately without dimming controls that are only waiting for confirmation. A compact Waiting indicator and Retry same command appear in the existing panel header after 300 ms, so quick commands do not flash a banner or move the timer. Settings use the same delayed feedback without replacing your draft.
 
 ## Sync, disconnection, and recovery
 

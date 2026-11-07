@@ -16,6 +16,8 @@ npm.cmd --prefix desktop ci
 .\dist\Start-PomoRestbank.ps1
 ```
 
+Build melewati penyalinan executable klien/server jika isinya identik, sehingga server aktif yang tidak berubah tidak menghalangi packaging. Jika executable berubah dan sedang dipakai, tutup proses yang memakai file tersebut lalu ulangi build; skrip tidak menghentikan proses secara otomatis.
+
 Launcher menjalankan server lokal jika belum aktif, menyiapkan koneksi untuk profil baru, lalu membuka aplikasi. Menutup jendela tidak menghentikan server maupun timer yang sedang berjalan.
 
 Untuk dua jendela, gunakan profil berbeda:
@@ -42,6 +44,8 @@ Menjalankan executable secara langsung juga bisa. Di Settings, masukkan alamat s
 - Subject dapat ditambah atau dihapus dari daftar. Klik kanan item subject untuk menghapus tanpa memilihnya terlebih dahulu. Umum dilindungi. Riwayat dan progres subject yang dihapus tetap disimpan.
 - History menampilkan ringkasan per subject dan 30 sesi terbaru dengan waktu Asia/Jakarta. Tema terang/gelap bersifat lokal.
 - Space hanya untuk Pause/Resume; input teks dan dialog tidak terganggu.
+
+Pembaruan timer mempertahankan input yang sedang diedit, fokus keyboard, dan menu subject yang terbuka selama kontrol masih tersedia. Mode Manual memerlukan durasi positif sebelum Start. Settings mempertahankan draft saat status kontrol mengikuti kondisi timer dan koneksi terbaru. Pesan validasi bertahan sampai input diedit atau dicoba kembali. Klik di luar dialog, gunakan Cancel/Close, atau tekan Escape untuk menutupnya. Animasi singkat dialog/menu mengikuti preferensi reduced motion sistem. History yang terbuka dimuat ulang setelah reconnect. Perintah langsung mengunci kontrol tanpa meredupkan kontrol yang hanya menunggu konfirmasi. Indikator Waiting dan Retry same command muncul pada baris judul panel setelah 300 ms, sehingga perintah cepat tidak memunculkan kilatan banner atau menggeser timer. Settings memakai indikator tertunda yang sama sambil mempertahankan draft.
 
 ## Sinkronisasi dan pemulihan
 

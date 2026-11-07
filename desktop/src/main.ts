@@ -115,6 +115,24 @@ let lastSnapshotKey = "";
 let spaceHeld = false;
 let dialogReturnFocus: HTMLElement | null = null;
 let settingsSaveRevision: number | null = null;
+let lastViewRevision: number | undefined;
+let renderedBanner: string | undefined;
+let commandSubmitting = false;
+let pendingFeedbackKey: string | null = null;
+let pendingFeedbackVisible = false;
+let pendingFeedbackTimer: number | undefined;
+const markupCache = new WeakMap<Element, string>();
+let renderedSubjects = "";
+let renderedHistory: History | null | undefined;
+let renderedHistoryTab = "";
+let renderedHistoryConnected: boolean | undefined;
+const historyDateFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Jakarta",
+  day: "2-digit",
+  month: "short",
+  hour: "2-digit",
+  minute: "2-digit",
+});
 const root = document.querySelector<HTMLDivElement>("#app")!;
 root.innerHTML = `<header class="topbar"><a class="brand" href="#" aria-label="Pomo Restbank home"><span class="brandmark">${icon("cup")}</span><span>Pomo <strong>Restbank</strong></span></a><div class="header-actions"><button class="icon-button" id="theme" aria-label="Toggle color theme">${icon("sun")}</button><button class="icon-button" id="settings" aria-label="Open settings">${icon("settings")}</button></div></header><main><div id="banner" role="status" aria-live="polite"></div><div id="workspace"></div></main><footer><span>Build focus. Bank your breaks.</span><span id="profile-label"></span></footer><dialog id="modal"><div id="modal-content"></div></dialog>`;
 const workspace = document.querySelector<HTMLDivElement>("#workspace")!;
@@ -136,16 +154,41 @@ document
   .querySelector(".brand")!
   .addEventListener("click", (e) => e.preventDefault());
 modal.addEventListener("click", (e) => {
-  if (e.target === modal) modal.close();
+  if (e.target !== modal) return;
+  const bounds = modal.getBoundingClientRect();
+  if (
+    e.clientX < bounds.left ||
+    e.clientX > bounds.right ||
+    e.clientY < bounds.top ||
+    e.clientY > bounds.bottom
+  )
+    modal.close();
 });
 modal.addEventListener("close", () => dialogReturnFocus?.focus());
 function openDialog(title: string, content: string) {
   dialogReturnFocus = document.activeElement as HTMLElement;
+  settingsSaveRevision = null;
   modalContent.innerHTML = `<div class="dialog-heading"><h2>${title}</h2><button class="icon-button close-modal" aria-label="Close dialog">${icon("close")}</button></div>${content}<p id="dialog-error" role="alert" class="error-text"></p>`;
   modalContent
     .querySelector(".close-modal")!
     .addEventListener("click", () => modal.close());
+  modalContent.querySelectorAll("input,select").forEach((input) => {
+    input.addEventListener("input", clearDialogError);
+  });
   if (!modal.open) modal.showModal();
+}
+function clearDialogError() {
+  const error = document.querySelector("#dialog-error");
+  if (error) error.textContent = "";
+}
+function setText(element: Element | null, value: string) {
+  if (element && element.textContent !== value) element.textContent = value;
+}
+function setMarkup(element: Element, value: string) {
+  if (markupCache.get(element) !== value) {
+    element.innerHTML = value;
+    markupCache.set(element, value);
+  }
 }
 async function call<T>(
   name: string,
@@ -166,31 +209,105 @@ function showError(error: string) {
   }
 }
 async function command(cmd: Command) {
+  if (
+    !connected() ||
+    commandSubmitting ||
+    view.pending ||
+    (view.snapshot?.storage_error && cmd.type !== "retry_storage")
+  )
+    return false;
   localError = null;
+  commandSubmitting = true;
+  render();
   try {
     await invoke("send_command", { command: cmd });
     return true;
   } catch (error) {
     showError(String(error));
     return false;
+  } finally {
+    commandSubmitting = false;
+    render();
   }
 }
 function connected() {
   return view.connection === "connected";
 }
+function available() {
+  return connected() && !view.snapshot?.storage_error;
+}
+function commandPending() {
+  return !!view.pending || commandSubmitting;
+}
 function usable() {
-  return connected() && !view.pending && !view.snapshot?.storage_error;
+  return available() && !commandPending();
+}
+function lockCommandControl(
+  control: HTMLButtonElement | HTMLInputElement | HTMLFieldSetElement,
+  unavailable: boolean,
+) {
+  const pendingOnly = commandPending() && !unavailable;
+  control.disabled = unavailable || commandPending();
+  control.classList.toggle("pending-lock", pendingOnly);
+  if (pendingOnly) control.setAttribute("aria-busy", "true");
+  else control.removeAttribute("aria-busy");
+}
+function pendingFeedbackMarkup(retryId: string) {
+  return `<div class="command-feedback" hidden><span role="status" aria-live="polite" aria-atomic="true"></span><button id="${retryId}" class="text-button">Retry same command</button></div>`;
+}
+function renderPendingFeedback() {
+  const visible = pendingFeedbackVisible && !!view.pending;
+  document
+    .querySelectorAll<HTMLElement>(".command-feedback")
+    .forEach((feedback) => {
+      feedback.hidden = !visible;
+      setText(
+        feedback.querySelector('[role="status"]'),
+        visible ? "Waiting\u2026" : "",
+      );
+      feedback.querySelector<HTMLButtonElement>("button")!.disabled =
+        !connected();
+    });
+  const title = workspace.querySelector<HTMLElement>(".section-top .eyebrow");
+  if (title) title.hidden = visible;
+  const description = modalContent.querySelector<HTMLElement>(
+    "#preferences-description",
+  );
+  if (description) description.hidden = visible;
+}
+function syncPendingFeedback() {
+  const key = view.pending
+    ? JSON.stringify([view.endpoint, view.profile, view.pending])
+    : null;
+  if (key === pendingFeedbackKey) return;
+  if (pendingFeedbackTimer !== undefined)
+    window.clearTimeout(pendingFeedbackTimer);
+  pendingFeedbackTimer = undefined;
+  pendingFeedbackKey = key;
+  pendingFeedbackVisible = false;
+  if (key) {
+    pendingFeedbackTimer = window.setTimeout(() => {
+      if (pendingFeedbackKey !== key || !view.pending) return;
+      pendingFeedbackTimer = undefined;
+      pendingFeedbackVisible = true;
+      renderPendingFeedback();
+    }, 300);
+  }
 }
 function renderBanner() {
   const banner = document.querySelector<HTMLDivElement>("#banner")!;
   const error = localError ?? view.error ?? view.snapshot?.storage_error;
-  banner.innerHTML = `${view.preview ? '<div class="notice preview">TEST MODE · Short sessions · Separate data</div>' : ""}${error ? `<div class="notice error">${escape(error)}</div>` : ""}${view.pending ? `<div class="notice">A command is waiting for confirmation. <button class="text-button" id="retry-pending" ${connected() ? "" : "disabled"}>Retry same command</button></div>` : ""}${view.snapshot?.storage_error ? '<button id="retry-storage" class="secondary">Retry storage</button>' : ""}`;
-  banner
-    .querySelector("#retry-pending")
-    ?.addEventListener("click", () => call("retry_pending"));
-  banner
-    .querySelector("#retry-storage")
-    ?.addEventListener("click", () => command({ type: "retry_storage" }));
+  const content = `${view.preview ? '<div class="notice preview">TEST MODE · Short sessions · Separate data</div>' : ""}${error ? `<div class="notice error">${escape(error)}</div>` : ""}${view.snapshot?.storage_error ? '<button id="retry-storage" class="secondary">Retry storage</button>' : ""}`;
+  if (renderedBanner !== content) {
+    renderedBanner = content;
+    banner.innerHTML = content;
+    banner
+      .querySelector("#retry-storage")
+      ?.addEventListener("click", () => command({ type: "retry_storage" }));
+  }
+  const retryStorage =
+    banner.querySelector<HTMLButtonElement>("#retry-storage");
+  if (retryStorage) lockCommandControl(retryStorage, !connected());
 }
 function progress(s: State) {
   const t = s.timer?.phase === "focus" ? s.timer : s.timer?.suspended_focus;
@@ -200,44 +317,119 @@ function progress(s: State) {
     ? s.shared_progress
     : (s.per_subject_progress[s.subject] ?? 0);
 }
+function canEditSettings() {
+  return usable() && view.snapshot?.state.status === "idle";
+}
+function syncDialogControls() {
+  const preferences =
+    modalContent.querySelector<HTMLFormElement>("#preferences");
+  if (!preferences) return;
+  const unavailable = !available() || view.snapshot?.state.status !== "idle";
+  lockCommandControl(
+    preferences.querySelector<HTMLFieldSetElement>("fieldset")!,
+    unavailable,
+  );
+  lockCommandControl(
+    preferences.querySelector<HTMLButtonElement>('[type="submit"]')!,
+    unavailable,
+  );
+  modalContent.querySelector<HTMLElement>("#preferences-hint")!.hidden =
+    !unavailable;
+  lockCommandControl(
+    modalContent.querySelector<HTMLButtonElement>(
+      '#connection-form [type="submit"]',
+    )!,
+    false,
+  );
+}
+function buildWorkspace() {
+  renderedSubjects = "";
+  renderedHistory = undefined;
+  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong id="balance"></strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong><span id="focus-progress"></span> <small id="focus-total"></small></strong></div></div></div><p class="scope-note"></p><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">Choose duration</button></div><div class="panel-bottom"><button id="history-toggle" class="text-button"></button><button id="timer-settings" class="text-button">${icon("settings")}Settings</button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
+  workspace
+    .querySelector("#connection-status")!
+    .addEventListener("click", () => openSettings(true));
+  workspace
+    .querySelector("#timer-settings")!
+    .addEventListener("click", () => openSettings());
+  workspace
+    .querySelectorAll<HTMLButtonElement>("[data-mode]")
+    .forEach((button) => {
+      button.addEventListener("click", () =>
+        command({
+          type: "select",
+          mode: button.dataset.mode!,
+          subject: view.snapshot!.state.subject,
+        }),
+      );
+    });
+  workspace
+    .querySelector("#retry-pending")!
+    .addEventListener("click", () => call("retry_pending"));
+  setupSubjects();
+  setupDuration();
+  workspace.querySelector("#primary")!.addEventListener("click", primary);
+  workspace.querySelector("#reset")!.addEventListener("click", () => {
+    manual = [0, 0, 0];
+    workspace
+      .querySelectorAll<HTMLInputElement>(".duration-fields input")
+      .forEach((input) => (input.value = "00"));
+    command({ type: "reset" });
+  });
+  workspace
+    .querySelector("#skip")!
+    .addEventListener("click", () => command({ type: "skip_break" }));
+  workspace.querySelector("#break-all")!.addEventListener("click", () =>
+    command({
+      type: "start_break",
+      seconds: Math.min(view.snapshot!.state.balance_seconds, 4294967295),
+    }),
+  );
+  workspace
+    .querySelector("#break-choose")!
+    .addEventListener("click", chooseBreak);
+  workspace
+    .querySelector("#add-subject")!
+    .addEventListener("click", addSubject);
+  workspace
+    .querySelector("#delete-subject")!
+    .addEventListener("click", () =>
+      deleteSubject(view.snapshot!.state.subject),
+    );
+  workspace.querySelector("#history-toggle")!.addEventListener("click", () => {
+    historyVisible = !historyVisible;
+    render();
+    if (historyVisible) loadHistory();
+  });
+}
 function render() {
   renderBanner();
-  document.querySelector("#profile-label")!.textContent =
-    `Profile: ${view.profile}`;
+  setText(document.querySelector("#profile-label"), `Profile: ${view.profile}`);
   const s = view.snapshot?.state;
-  const idle = s?.status === "idle";
-  const disabled = !usable();
-  const settingsDisabled = disabled || !idle;
-  const statusName =
-    view.connection === "connected"
-      ? "Connected"
-      : view.connection === "connecting"
-        ? "Connecting"
-        : "Disconnected";
   if (!s) {
-    workspace.innerHTML = `<section class="welcome panel"><span class="eyebrow">YOUR SPACE TO FOCUS</span><div class="welcome-icon">${icon("cup")}</div><h1>A little focus.<br>A well-earned break.</h1><p>Connect to your Restbank server to start a shared timer and keep your progress together.</p><button id="setup" class="primary">${icon("link")}Connect your timer</button><span class="connection ${view.connection}"><i></i>${statusName}</span></section>`;
-    workspace
-      .querySelector("#setup")!
-      .addEventListener("click", () => openSettings(true));
+    if (!workspace.querySelector("#setup")) {
+      workspace.innerHTML = `<section class="welcome panel"><span class="eyebrow">YOUR SPACE TO FOCUS</span><div class="welcome-icon">${icon("cup")}</div><h1>A little focus.<br>A well-earned break.</h1><p>Connect to your Restbank server to start a shared timer and keep your progress together.</p><button id="setup" class="primary">${icon("link")}Connect your timer</button><span class="connection"></span></section>`;
+      workspace
+        .querySelector("#setup")!
+        .addEventListener("click", () => openSettings(true));
+    }
+    const connection = workspace.querySelector(".connection")!;
+    connection.className = `connection ${view.connection}`;
+    setMarkup(connection, `<i></i>${connectionName()}`);
+    syncDialogControls();
+    renderPendingFeedback();
     return;
   }
+  if (!workspace.querySelector("#primary")) buildWorkspace();
+  const idle = s.status === "idle";
+  const disabled = !usable();
+  const settingsDisabled = disabled || !idle;
   const canBreak =
     s.mode === "pomodoro" &&
     s.balance_seconds > 0 &&
     (idle ||
       s.status === "choice" ||
       (s.status === "paused" && s.timer?.phase === "focus"));
-  const remaining =
-    s.timer?.remaining_seconds ??
-    (s.mode === "manual"
-      ? manual[0] * 3600 + manual[1] * 60 + manual[2]
-      : s.focus_seconds - progress(s));
-  const focusProgress = progress(s);
-  const ring = s.timer
-    ? 1 - remaining / s.timer.total_seconds
-    : s.mode === "pomodoro"
-      ? focusProgress / s.focus_seconds
-      : 0;
   const title =
     s.status === "alarm"
       ? "Time to take a breath"
@@ -249,15 +441,15 @@ function render() {
             ? "Ready when you are"
             : "One thing at a time";
   const label =
-    s.status === "alarm"
-      ? "Stop Alarm"
-      : s.status === "choice"
-        ? "Continue Focus"
-        : s.status === "running"
-          ? "Pause"
-          : s.status === "paused"
-            ? "Resume"
-            : "Start focus";
+    s.mode === "manual" && idle
+      ? "Start timer"
+      : {
+          idle: "Start focus",
+          running: "Pause",
+          paused: "Resume",
+          choice: "Continue Focus",
+          alarm: "Stop Alarm",
+        }[s.status];
   const caption =
     s.status === "alarm"
       ? "Session complete"
@@ -270,55 +462,113 @@ function render() {
             : s.mode === "manual"
               ? "Manual session"
               : `Focus session ${s.cycle_position + 1} of 4`;
-  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="eyebrow">${escape(title)}</span><button id="connection-status" class="connection ${view.connection}" title="Connection settings"><i></i>${statusName}</button></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual" class="${s.mode === "manual" ? "selected" : ""}" ${settingsDisabled ? "disabled" : ""}>Manual</button><button data-mode="pomodoro" class="${s.mode === "pomodoro" ? "selected" : ""}" ${settingsDisabled ? "disabled" : ""}>Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false" ${settingsDisabled ? "disabled" : ""}>${escape(s.subject)}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects">${s.subjects.map((n) => `<button class="subject-option" role="option" aria-selected="${n === s.subject}" data-name="${escape(n)}">${escape(n)}</button>`).join("")}<div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject" ${settingsDisabled ? "disabled" : ""}>${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject" ${settingsDisabled || s.subject === "Umum" ? "disabled" : ""}>${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8;stroke-dashoffset:${860.8 * (1 - Math.max(0, Math.min(1, ring)))}"/></svg><div class="timer-content">${icon(s.timer?.phase === "break" ? "cup" : "clock")}<div id="countdown" class="countdown" aria-label="Time remaining">${formatTime(remaining)}</div><span class="timer-caption">${caption}</span><span id="estimate" class="estimate">${connected() ? "&nbsp;" : "Estimated · waiting for server"}</span></div></div>${s.mode === "manual" ? `<div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}" ${settingsDisabled ? "disabled" : ""}></label>`).join('<span class="colon">:</span>')}</div>` : ""}<div class="timer-actions"><button id="primary" class="primary" ${disabled ? "disabled" : ""}>${icon(s.status === "running" ? "pause" : s.status === "alarm" ? "clock" : "play")}${s.mode === "manual" && idle ? "Start timer" : label}</button><button id="reset" class="secondary" ${disabled ? "disabled" : ""}>${icon("reset")}Reset</button></div>${s.timer?.phase === "break" ? `<button id="skip" class="text-button" ${disabled || s.status !== "running" ? "disabled" : ""}>Skip break</button>` : ""}<div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong>${formatTime(s.balance_seconds)}</strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong>${formatTime(focusProgress)} <small>/ ${formatTime(s.focus_seconds)}</small></strong></div></div></div><p class="scope-note">${s.settings.focus_scope === "shared" ? "One focus target, shared across subjects." : "A separate focus target for each subject."}</p><div class="break-actions"><button id="break-all" class="secondary" ${!canBreak || disabled ? "disabled" : ""}>${icon("cup")}Use break balance</button><button id="break-choose" class="text-button" ${!canBreak || disabled ? "disabled" : ""}>Choose duration</button></div><div class="panel-bottom"><button id="history-toggle" class="text-button">${icon("history")}${historyVisible ? "Hide History" : "Show History"}</button><button id="timer-settings" class="text-button">${icon("settings")}Settings</button></div></section><section id="history-panel" class="panel history-panel" ${historyVisible ? "" : "hidden"}></section>`;
-  workspace
-    .querySelector("#connection-status")!
-    .addEventListener("click", () => openSettings(true));
-  workspace
-    .querySelector("#timer-settings")!
-    .addEventListener("click", () => openSettings());
+  setText(workspace.querySelector(".section-top .eyebrow"), title);
+  const connection =
+    workspace.querySelector<HTMLButtonElement>("#connection-status")!;
+  connection.className = `connection ${view.connection}`;
+  setText(connection.querySelector("span"), connectionName());
   workspace
     .querySelectorAll<HTMLButtonElement>("[data-mode]")
-    .forEach((b) =>
-      b.addEventListener("click", () =>
-        command({ type: "select", mode: b.dataset.mode!, subject: s.subject }),
-      ),
+    .forEach((button) => {
+      const selected = button.dataset.mode === s.mode;
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      lockCommandControl(button, !available() || !idle);
+    });
+  const subject = workspace.querySelector<HTMLButtonElement>("#subject")!;
+  setText(subject.querySelector(".subject-name"), s.subject);
+  subject.title = s.subject;
+  lockCommandControl(subject, !available() || !idle);
+  lockCommandControl(
+    workspace.querySelector<HTMLButtonElement>("#add-subject")!,
+    !available() || !idle,
+  );
+  lockCommandControl(
+    workspace.querySelector<HTMLButtonElement>("#delete-subject")!,
+    !available() || !idle || s.subject === "Umum",
+  );
+  const popup = workspace.querySelector<HTMLDivElement>("#subject-popup")!;
+  const subjectKey = JSON.stringify(s.subjects);
+  if (subjectKey !== renderedSubjects) {
+    popup.querySelectorAll(".subject-option").forEach((row) => row.remove());
+    workspace.querySelector<HTMLElement>("#subject-menu")!.hidden = true;
+    popup.insertAdjacentHTML(
+      "afterbegin",
+      s.subjects
+        .map(
+          (name) =>
+            `<button class="subject-option" role="option" data-name="${escape(name)}">${escape(name)}</button>`,
+        )
+        .join(""),
     );
-  setupSubjects(s, settingsDisabled);
-  workspace.querySelector("#primary")!.addEventListener("click", primary);
-  workspace.querySelector("#reset")!.addEventListener("click", () => {
-    manual = [0, 0, 0];
-    command({ type: "reset" });
-  });
-  workspace
-    .querySelector("#skip")
-    ?.addEventListener("click", () => command({ type: "skip_break" }));
-  workspace
-    .querySelector("#break-all")!
-    .addEventListener("click", () =>
-      command({
-        type: "start_break",
-        seconds: Math.min(s.balance_seconds, 4294967295),
-      }),
+    renderedSubjects = subjectKey;
+  }
+  popup
+    .querySelectorAll<HTMLButtonElement>(".subject-option")
+    .forEach((row) =>
+      row.setAttribute("aria-selected", String(row.dataset.name === s.subject)),
     );
+  if (settingsDisabled && popup.matches(":popover-open")) popup.hidePopover();
+  setMarkup(
+    workspace.querySelector(".phase-icon")!,
+    icon(s.timer?.phase === "break" ? "cup" : "clock"),
+  );
+  setText(workspace.querySelector(".timer-caption"), caption);
+  workspace.querySelector<HTMLElement>(".duration-fields")!.hidden =
+    s.mode !== "manual";
   workspace
-    .querySelector("#break-choose")!
-    .addEventListener("click", chooseBreak);
-  workspace
-    .querySelector("#add-subject")!
-    .addEventListener("click", addSubject);
-  workspace
-    .querySelector("#delete-subject")!
-    .addEventListener("click", () => deleteSubject(s.subject));
-
-  workspace.querySelector("#history-toggle")!.addEventListener("click", () => {
-    historyVisible = !historyVisible;
-    render();
-    if (historyVisible) loadHistory();
-  });
-  setupDuration();
+    .querySelectorAll<HTMLInputElement>(".duration-fields input")
+    .forEach((input) => lockCommandControl(input, !available() || !idle));
+  const primaryButton = workspace.querySelector<HTMLButtonElement>("#primary")!;
+  setMarkup(
+    primaryButton,
+    `${icon(s.status === "running" ? "pause" : s.status === "alarm" ? "clock" : "play")}${label}`,
+  );
+  lockCommandControl(primaryButton, !available());
+  lockCommandControl(
+    workspace.querySelector<HTMLButtonElement>("#reset")!,
+    !available(),
+  );
+  const skip = workspace.querySelector<HTMLButtonElement>("#skip")!;
+  skip.hidden = s.timer?.phase !== "break";
+  lockCommandControl(skip, !available() || s.status !== "running");
+  setText(workspace.querySelector("#balance"), formatTime(s.balance_seconds));
+  setText(workspace.querySelector("#focus-progress"), formatTime(progress(s)));
+  setText(
+    workspace.querySelector("#focus-total"),
+    `/ ${formatTime(s.focus_seconds)}`,
+  );
+  setText(
+    workspace.querySelector(".scope-note"),
+    s.settings.focus_scope === "shared"
+      ? "One focus target, shared across subjects."
+      : "A separate focus target for each subject.",
+  );
+  lockCommandControl(
+    workspace.querySelector<HTMLButtonElement>("#break-all")!,
+    !available() || !canBreak,
+  );
+  lockCommandControl(
+    workspace.querySelector<HTMLButtonElement>("#break-choose")!,
+    !available() || !canBreak,
+  );
+  setMarkup(
+    workspace.querySelector("#history-toggle")!,
+    `${icon("history")}${historyVisible ? "Hide History" : "Show History"}`,
+  );
+  workspace.querySelector<HTMLElement>("#history-panel")!.hidden =
+    !historyVisible;
   if (historyVisible) renderHistory();
+  syncDialogControls();
+  renderPendingFeedback();
   updateCountdown();
+}
+function connectionName() {
+  return view.connection === "connected"
+    ? "Connected"
+    : view.connection === "connecting"
+      ? "Connecting"
+      : "Disconnected";
 }
 function commitDuration(i: number) {
   const input = document.querySelector<HTMLInputElement>(`#duration-${i}`);
@@ -329,18 +579,18 @@ function commitDuration(i: number) {
   input.value = String(manual[i]).padStart(2, "0");
   updateCountdown();
 }
-function setupSubjects(s: State, disabled: boolean) {
-  const trigger = document.querySelector<HTMLButtonElement>("#subject")!;
-  const popup = document.querySelector<HTMLDivElement>("#subject-popup")!;
-  const menu = document.querySelector<HTMLDivElement>("#subject-menu")!;
-  const remove = document.querySelector<HTMLButtonElement>("#context-delete")!;
+function setupSubjects() {
+  const trigger = workspace.querySelector<HTMLButtonElement>("#subject")!;
+  const popup = workspace.querySelector<HTMLDivElement>("#subject-popup")!;
+  const menu = workspace.querySelector<HTMLDivElement>("#subject-menu")!;
+  const remove = workspace.querySelector<HTMLButtonElement>("#context-delete")!;
   let contextName = "";
   let contextRow: HTMLButtonElement | null = null;
   trigger.addEventListener("click", () => {
-    if (disabled) return;
+    if (trigger.disabled) return;
     const rect = trigger.getBoundingClientRect();
-    popup.style.left = `${Math.min(rect.left, window.innerWidth - 240)}px`;
-    popup.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 230)}px`;
+    popup.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 240))}px`;
+    popup.style.top = `${Math.max(8, Math.min(rect.bottom + 6, window.innerHeight - 230))}px`;
     popup.showPopover();
     trigger.setAttribute("aria-expanded", "true");
     popup.querySelector<HTMLButtonElement>('[aria-selected="true"]')?.focus();
@@ -350,45 +600,57 @@ function setupSubjects(s: State, disabled: boolean) {
     trigger.setAttribute("aria-expanded", String(open));
     if (!open) menu.hidden = true;
   });
-  const rows = Array.from(
-    popup.querySelectorAll<HTMLButtonElement>(".subject-option"),
-  );
-  rows.forEach((row) => {
-    row.addEventListener("click", () => {
-      popup.hidePopover();
-      command({ type: "select", mode: s.mode, subject: row.dataset.name! });
+  popup.addEventListener("click", (event) => {
+    const row = (event.target as Element).closest<HTMLButtonElement>(
+      ".subject-option",
+    );
+    if (!row || trigger.disabled) return;
+    popup.hidePopover();
+    trigger.focus();
+    command({
+      type: "select",
+      mode: view.snapshot!.state.mode,
+      subject: row.dataset.name!,
     });
-    row.addEventListener("contextmenu", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      contextName = row.dataset.name!;
-      contextRow = row;
-      remove.disabled = contextName === "Umum";
-      menu.hidden = false;
-      const bounds = popup.getBoundingClientRect();
-      menu.style.top = `${Math.max(0, row.offsetTop - row.parentElement!.scrollTop)}px`;
-      menu.style.left = `${Math.min(bounds.width - 155, 45)}px`;
-      remove.focus();
-    });
+  });
+  popup.addEventListener("contextmenu", (event) => {
+    const row = (event.target as Element).closest<HTMLButtonElement>(
+      ".subject-option",
+    );
+    if (!row) return;
+    event.preventDefault();
+    event.stopPropagation();
+    contextName = row.dataset.name!;
+    contextRow = row;
+    remove.disabled = contextName === "Umum";
+    menu.hidden = false;
+    menu.style.top = `${Math.max(0, row.offsetTop - popup.scrollTop)}px`;
+    menu.style.left = `${Math.min(popup.getBoundingClientRect().width - 155, 45)}px`;
+    remove.focus();
   });
   remove.addEventListener("click", () => {
-    if (contextName === "Umum") return;
+    if (contextName === "Umum" || trigger.disabled) return;
     popup.hidePopover();
+    trigger.focus();
     deleteSubject(contextName);
   });
-  popup.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" && !menu.hidden) {
-      e.preventDefault();
-      e.stopPropagation();
+  popup.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !menu.hidden) {
+      event.preventDefault();
+      event.stopPropagation();
       menu.hidden = true;
       contextRow?.focus();
       return;
     }
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-      e.preventDefault();
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      const rows = Array.from(
+        popup.querySelectorAll<HTMLButtonElement>(".subject-option"),
+      );
       const index = rows.indexOf(document.activeElement as HTMLButtonElement);
       rows[
-        (index + (e.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length
+        (index + (event.key === "ArrowDown" ? 1 : rows.length - 1)) %
+          rows.length
       ]?.focus();
     }
   });
@@ -397,6 +659,13 @@ function setupDuration() {
   for (let i = 0; i < 3; i++) {
     const input = document.querySelector<HTMLInputElement>(`#duration-${i}`);
     if (!input) continue;
+    input.addEventListener("input", () => {
+      const max = i === 0 ? 99 : 59;
+      if (/^\d{1,2}$/.test(input.value) && Number(input.value) <= max) {
+        manual[i] = Number(input.value);
+        updateCountdown();
+      }
+    });
     input.addEventListener("blur", () => commitDuration(i));
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
@@ -459,6 +728,14 @@ function primary() {
     alarm: "stop_alarm",
   };
   for (let i = 0; i < 3; i++) commitDuration(i);
+  if (
+    s.status === "idle" &&
+    s.mode === "manual" &&
+    manual.every((value) => value === 0)
+  ) {
+    showError("Enter a duration from 00:00:01 to 99:59:59.");
+    return;
+  }
   command(
     s.status === "idle"
       ? {
@@ -530,10 +807,10 @@ function deleteSubject(name: string) {
 function openSettings(connectionOnly = false) {
   settingsSaveRevision = null;
   const s = view.snapshot?.state;
-  const editable = usable() && s?.status === "idle";
+  const editable = canEditSettings();
   openDialog(
     "Make it your space",
-    `<div class="settings-section"><h3>Timer preferences</h3><p class="muted">Shared with your other connected clients.</p>${!editable ? '<p class="hint">Connect and finish or Reset the timer to edit preferences.</p>' : ""}<form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section"><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div>`,
+    `<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">Shared with your other connected clients.</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section"><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div>`,
   );
   document
     .querySelector("#cancel-preferences")!
@@ -546,7 +823,11 @@ function openSettings(connectionOnly = false) {
     .querySelector("#preferences")!
     .addEventListener("submit", async (e) => {
       e.preventDefault();
-      if (!editable) return;
+      if (!canEditSettings()) {
+        syncDialogControls();
+        return;
+      }
+      clearDialogError();
       const scope = (document.querySelector("#scope") as HTMLSelectElement)
         .value;
       const tick = (document.querySelector("#tick-sound") as HTMLInputElement)
@@ -581,6 +862,11 @@ function openSettings(connectionOnly = false) {
         showError(String(error));
       }
     });
+  modalContent
+    .querySelector("#retry-settings-pending")!
+    .addEventListener("click", () => call("retry_pending"));
+  syncDialogControls();
+  renderPendingFeedback();
   if (connectionOnly)
     document.querySelector<HTMLInputElement>("#endpoint")!.focus();
 }
@@ -590,7 +876,34 @@ async function loadHistory() {
 function renderHistory() {
   const panel = document.querySelector("#history-panel");
   if (!panel) return;
-  panel.innerHTML = `<div class="history-heading"><div><span class="eyebrow">A LITTLE PROGRESS, EVERY DAY</span><h2>Your focus, remembered</h2></div><button id="refresh-history" class="icon-button" aria-label="Refresh history">${icon("reset")}</button></div><div class="history-tabs"><button data-tab="recent" class="${historyTab === "recent" ? "active" : ""}">Recent sessions</button><button data-tab="summary" class="${historyTab === "summary" ? "active" : ""}">By subject</button></div><div id="history-list"></div>`;
+  if (!panel.querySelector("#history-list")) {
+    panel.innerHTML = `<div class="history-heading"><div><span class="eyebrow">A LITTLE PROGRESS, EVERY DAY</span><h2>Your focus, remembered</h2></div><button id="refresh-history" class="icon-button" aria-label="Refresh history">${icon("reset")}</button></div><div class="history-tabs"><button data-tab="recent" class="${historyTab === "recent" ? "active" : ""}">Recent sessions</button><button data-tab="summary" class="${historyTab === "summary" ? "active" : ""}">By subject</button></div><div id="history-list"></div>`;
+    panel
+      .querySelectorAll<HTMLButtonElement>("[data-tab]")
+      .forEach((button) => {
+        button.addEventListener("click", () => {
+          historyTab = button.dataset.tab!;
+          renderHistory();
+        });
+      });
+    panel
+      .querySelector("#refresh-history")!
+      .addEventListener("click", loadHistory);
+  }
+  if (
+    renderedHistory === history &&
+    renderedHistoryTab === historyTab &&
+    renderedHistoryConnected === connected()
+  )
+    return;
+  renderedHistory = history;
+  renderedHistoryTab = historyTab;
+  renderedHistoryConnected = connected();
+  panel.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
+    const active = button.dataset.tab === historyTab;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
   const list = panel.querySelector("#history-list")!;
   if (!connected())
     list.innerHTML =
@@ -602,7 +915,7 @@ function renderHistory() {
       ? history.sessions
           .map(
             (s) =>
-              `<div class="history-row"><span class="session-icon">${icon("clock")}</span><div><strong>${escape(s.subject)}</strong><span>${escape(new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(s.recorded_at)))} · ${s.mode === "manual" ? "Manual" : "Pomodoro"}</span></div><strong>${duration(s.duration_seconds)}</strong></div>`,
+              `<div class="history-row"><span class="session-icon">${icon("clock")}</span><div><strong>${escape(s.subject)}</strong><span>${escape(historyDateFormat.format(new Date(s.recorded_at)))} · ${s.mode === "manual" ? "Manual" : "Pomodoro"}</span></div><strong>${duration(s.duration_seconds)}</strong></div>`,
           )
           .join("")
       : '<p class="empty-state">Your first session starts a story.<br>Finish a timer to see it here.</p>';
@@ -615,15 +928,6 @@ function renderHistory() {
           )
           .join("")
       : '<p class="empty-state">No sessions yet.</p>';
-  panel.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((b) =>
-    b.addEventListener("click", () => {
-      historyTab = b.dataset.tab!;
-      renderHistory();
-    }),
-  );
-  panel
-    .querySelector("#refresh-history")!
-    .addEventListener("click", loadHistory);
 }
 function updateCountdown() {
   const s = view.snapshot?.state;
@@ -638,14 +942,25 @@ function updateCountdown() {
       ? manual[0] * 3600 + manual[1] * 60 + manual[2]
       : s.focus_seconds - progress(s);
   const countdown = document.querySelector("#countdown");
-  if (countdown) countdown.textContent = formatTime(remaining);
+  setText(countdown, formatTime(remaining));
+  const ring = workspace.querySelector<SVGCircleElement>(".ring-fill");
+  if (ring) {
+    const fraction = s.timer
+      ? 1 - remaining / s.timer.total_seconds
+      : s.mode === "pomodoro"
+        ? progress(s) / s.focus_seconds
+        : 0;
+    const offset = String(860.8 * (1 - Math.max(0, Math.min(1, fraction))));
+    if (ring.style.strokeDashoffset !== offset)
+      ring.style.strokeDashoffset = offset;
+  }
   const estimate = document.querySelector("#estimate");
   if (estimate)
     estimate.textContent = !connected()
       ? remaining === 0
         ? "Waiting for server"
         : "Estimated · waiting for server"
-      : elapsed > 2
+      : s.status === "running" && (remaining === 0 || elapsed > 2)
         ? "Waiting for server"
         : "\u00a0";
 }
@@ -680,9 +995,14 @@ function applyView(next: View) {
     snapshotArrived = performance.now();
     lastSnapshotKey = key;
   }
-  const changed =
-    next.snapshot?.state.revision !== view.snapshot?.state.revision;
+  const changed = next.snapshot?.state.revision !== lastViewRevision;
+  const reconnected = next.connection === "connected" && !connected();
+  const serverChanged = next.endpoint !== view.endpoint;
+  const previousError = view.error;
+  if (serverChanged) history = null;
+  lastViewRevision = next.snapshot?.state.revision;
   view = next;
+  syncPendingFeedback();
   render();
   if (
     modal.open &&
@@ -694,19 +1014,14 @@ function applyView(next: View) {
     if (!view.error) modal.close();
     settingsSaveRevision = null;
   }
-  if (historyVisible && changed && connected()) loadHistory();
-  if (modal.open && view.error)
-    document.querySelector("#dialog-error")!.textContent = view.error;
   if (
-    modal.open &&
-    !view.pending &&
-    !view.error &&
-    view.snapshot?.state.status === "idle"
-  ) {
-    // Keep Settings open so a failed save never discards pending choices.
-    const output = document.querySelector("#dialog-error");
-    if (output) output.textContent = "";
-  }
+    historyVisible &&
+    (changed || reconnected || serverChanged) &&
+    connected()
+  )
+    loadHistory();
+  if (modal.open && view.error && view.error !== previousError)
+    document.querySelector("#dialog-error")!.textContent = view.error;
 }
 async function boot() {
   await listen<View>("restbank:view", (event) => applyView(event.payload));

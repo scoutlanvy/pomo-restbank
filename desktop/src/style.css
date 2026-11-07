@@ -6,7 +6,7 @@
   --bg: #f5f5f8;
   --panel: #fff;
   --text: #242637;
-  --muted: #858596;
+  --muted: #67677b;
   --line: #e9e9f0;
   --accent: #6859cf;
   --accent-soft: #f0edfc;
@@ -55,6 +55,11 @@ button {
 button:disabled {
   opacity: 0.42;
   cursor: not-allowed;
+}
+button.pending-lock:disabled,
+fieldset.pending-lock:disabled {
+  opacity: 1;
+  cursor: progress;
 }
 button:not(:disabled):active {
   transform: translateY(1px);
@@ -118,7 +123,8 @@ svg {
   color: var(--muted);
   border-radius: 10px;
 }
-.icon-button:hover:not(:disabled) {
+.icon-button:hover:not(:disabled),
+.icon-button.pending-lock:hover {
   background: var(--accent-soft);
   color: var(--accent);
 }
@@ -146,6 +152,7 @@ main {
   text-align: center;
 }
 .section-top {
+  min-height: 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -271,7 +278,7 @@ main {
   justify-content: center;
   align-items: center;
 }
-.timer-content > svg {
+.phase-icon > svg {
   width: 28px;
   height: 28px;
   color: var(--accent);
@@ -314,7 +321,8 @@ main {
   background: var(--accent);
   color: #fff;
 }
-.primary:hover:not(:disabled) {
+.primary:hover:not(:disabled),
+.primary.pending-lock:hover {
   filter: brightness(1.07);
 }
 :root[data-theme="dark"] .primary {
@@ -325,7 +333,8 @@ main {
   background: var(--panel);
   color: var(--text);
 }
-.secondary:hover:not(:disabled) {
+.secondary:hover:not(:disabled),
+.secondary.pending-lock:hover {
   background: var(--field);
 }
 .timer-actions .primary {
@@ -398,7 +407,8 @@ main {
   color: var(--muted);
   font-size: 12px;
 }
-.text-button:hover:not(:disabled) {
+.text-button:hover:not(:disabled),
+.text-button.pending-lock:hover {
   color: var(--accent);
 }
 .text-button svg {
@@ -750,10 +760,30 @@ output {
     gap: 4px;
   }
 }
+@keyframes dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+dialog[open] {
+  animation: dialog-enter 140ms ease-out;
+}
+.subject-popup:popover-open {
+  animation: dialog-enter 100ms ease-out;
+}
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation: none !important;
     scroll-behavior: auto !important;
+  }
+  button:not(:disabled):active {
+    transform: none;
   }
 }
 .subject-picker {
@@ -827,4 +857,38 @@ output {
   .subject-picker {
     width: 130px;
   }
+}
+
+.subject-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-heading {
+  min-width: 0;
+  text-align: left;
+}
+.command-feedback {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+.command-feedback .text-button {
+  font-size: 11px;
+  padding: 6px 0;
+  color: var(--accent);
+}
+.preferences-status {
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+}
+.preferences-status .muted {
+  margin: 0;
 }

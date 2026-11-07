@@ -4,6 +4,21 @@ $projectRoot = Split-Path $PSScriptRoot -Parent
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot 'dist' }
 $env:CARGO_TARGET_DIR = Join-Path $env:TEMP 'pomo-restbank-build-20261107'
 $env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+function Copy-BuildExecutable {
+    param([string]$Source, [string]$DestinationDirectory)
+    $destination = Join-Path $DestinationDirectory (Split-Path $Source -Leaf)
+    if ((Test-Path -LiteralPath $destination -PathType Leaf) -and
+        ((Get-FileHash -LiteralPath $Source -Algorithm SHA256).Hash -eq
+         (Get-FileHash -LiteralPath $destination -Algorithm SHA256).Hash)) {
+        Write-Host "Already current: $destination"
+        return
+    }
+    try {
+        Copy-Item -LiteralPath $Source -Destination $destination -ErrorAction Stop
+    } catch {
+        throw "Cannot replace '$destination'. Close the client or server using this exact file, then rerun Build.ps1. No running process was stopped. $($_.Exception.Message)"
+    }
+}
 Push-Location $projectRoot
 try {
     & cargo build --release -p pomo-restbank-server
@@ -14,8 +29,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Desktop build failed.' }
     } finally { Pop-Location }
     New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
-    Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'release\pomo-restbank.exe') -Destination $OutputDirectory
-    Copy-Item -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'release\pomo-restbank-server.exe') -Destination $OutputDirectory
+    Copy-BuildExecutable -Source (Join-Path $env:CARGO_TARGET_DIR 'release\pomo-restbank.exe') -DestinationDirectory $OutputDirectory
+    Copy-BuildExecutable -Source (Join-Path $env:CARGO_TARGET_DIR 'release\pomo-restbank-server.exe') -DestinationDirectory $OutputDirectory
     Get-ChildItem -LiteralPath (Join-Path $env:CARGO_TARGET_DIR 'release\bundle\nsis') -Filter '*-setup.exe' -File | Copy-Item -Destination $OutputDirectory
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'Start-PomoRestbank.ps1') -Destination $OutputDirectory
     Copy-Item -LiteralPath (Join-Path $projectRoot 'README.id.md') -Destination (Join-Path $OutputDirectory 'PETUNJUK.md')

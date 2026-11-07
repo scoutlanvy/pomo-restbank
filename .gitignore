@@ -12,3 +12,4 @@ connection.json
 .venv/
 __pycache__/
 .pytest_cache/
+/.agents/skills/
