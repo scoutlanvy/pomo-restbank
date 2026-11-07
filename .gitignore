@@ -13,4 +13,4 @@ connection.json
 __pycache__/
 .pytest_cache/
 /.agents/skills/
-/Inbox/
+/00-Inbox/
