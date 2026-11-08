@@ -16,6 +16,10 @@ clap.workspace = true
 anyhow.workspace = true
 futures-util.workspace = true
 fs2 = "0.4"
-[dev-dependencies]
 tempfile.workspace = true
+[dev-dependencies]
 tokio-tungstenite.workspace = true
+
+[[bin]]
+name = "PomoRestbank-Launcher"
+path = "src/launcher.rs"

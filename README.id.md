@@ -12,8 +12,8 @@ Jalankan dari root proyek:
 
 ```powershell
 npm.cmd --prefix desktop ci
-.\scripts\Build.ps1
-.\dist\Start-PomoRestbank.ps1
+npm.cmd --prefix desktop run release
+.\dist\PomoRestbank-Launcher.exe
 ```
 
 Build melewati penyalinan executable klien/server jika isinya identik, sehingga server aktif yang tidak berubah tidak menghalangi packaging. Jika executable berubah dan sedang dipakai, tutup proses yang memakai file tersebut lalu ulangi build; skrip tidak menghentikan proses secara otomatis.
@@ -23,11 +23,11 @@ Launcher menjalankan server lokal jika belum aktif, menyiapkan koneksi untuk pro
 Untuk dua jendela, gunakan profil berbeda:
 
 ```powershell
-.\dist\Start-PomoRestbank.ps1 -Profile first
-.\dist\Start-PomoRestbank.ps1 -Profile second
+.\dist\PomoRestbank-Launcher.exe --profile first
+.\dist\PomoRestbank-Launcher.exe --profile second
 ```
 
-Tambahkan `-Preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Jika kebijakan PowerShell memblokir skrip, jalankan `powershell -ExecutionPolicy Bypass -File .\dist\Start-PomoRestbank.ps1`.
+Tambahkan `--preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Bisa juga klik dua kali `PomoRestbank-Launcher.exe`; pengguna tidak memerlukan Node.js atau skrip PowerShell. Launcher harus berada di samping executable klien dan server. Installer NSIS hanya memasang klien; gunakan ZIP portable untuk launcher dan server.
 
 Menjalankan executable secara langsung juga bisa. Di Settings, masukkan alamat server dan token dari `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Token preview ada di `preview-server\token.txt`. Jaga kerahasiaan token dan `connection.json` profil klien.
 

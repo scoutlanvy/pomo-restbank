@@ -14,28 +14,28 @@ To run: Windows 10/11 and Microsoft Edge WebView2 Runtime. To build: stable Rust
 
 ## Build and run
 
-From the repository root, in PowerShell:
+From the repository root:
 
 ```powershell
 npm.cmd --prefix desktop ci
-.\scripts\Build.ps1
-.\dist\Start-PomoRestbank.ps1
+npm.cmd --prefix desktop run release
+.\dist\PomoRestbank-Launcher.exe
 ```
 
-The build creates a release client, a server, and an NSIS installer in `dist/`. Identical client/server executables are left in place, so an already-running unchanged server does not block packaging. If an executable has changed and is in use, close the process using that exact file and rerun the build; the script never stops it automatically. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. If PowerShell blocks scripts, use `powershell -ExecutionPolicy Bypass -File .\dist\Start-PomoRestbank.ps1` for this invocation.
+The build creates a release client, a server, and an NSIS installer in `dist/`. Identical client/server executables are left in place, so an already-running unchanged server does not block packaging. If an executable has changed and is in use, close the process using that exact file and rerun the build; the script never stops it automatically. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. You can also double-click `PomoRestbank-Launcher.exe`; users do not need Node.js or PowerShell scripts. The launcher must remain beside both executables. The NSIS installer installs only the client; use the portable ZIP for the launcher and server.
 
 For two clients on this computer:
 
 ```powershell
-.\dist\Start-PomoRestbank.ps1 -Profile first
-.\dist\Start-PomoRestbank.ps1 -Profile second
+.\dist\PomoRestbank-Launcher.exe --profile first
+.\dist\PomoRestbank-Launcher.exe --profile second
 ```
 
 For short preview sessions and separate data:
 
 ```powershell
-.\dist\Start-PomoRestbank.ps1 -Preview -Profile first
-.\dist\Start-PomoRestbank.ps1 -Preview -Profile second
+.\dist\PomoRestbank-Launcher.exe --preview --profile first
+.\dist\PomoRestbank-Launcher.exe --preview --profile second
 ```
 
 You can also start the executables yourself:
