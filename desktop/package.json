@@ -8,7 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "check": "tsc --noEmit",
     "test": "playwright test",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "release": "node ../scripts/build.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0"
