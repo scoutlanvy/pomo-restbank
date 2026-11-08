@@ -2770,6 +2770,7 @@ dependencies = [
  "futures-util",
  "hound",
  "restbank-domain",
+ "restbank-engine",
  "restbank-protocol",
  "serde",
  "serde_json",
@@ -2795,6 +2796,7 @@ dependencies = [
  "fs2",
  "futures-util",
  "restbank-domain",
+ "restbank-engine",
  "restbank-protocol",
  "serde_json",
  "sqlx",
@@ -3122,6 +3124,23 @@ name = "restbank-domain"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "uuid",
+]
+
+[[package]]
+name = "restbank-engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "fs2",
+ "restbank-domain",
+ "restbank-protocol",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tempfile",
+ "tokio",
  "uuid",
 ]
 

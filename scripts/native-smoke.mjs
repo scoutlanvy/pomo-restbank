@@ -96,6 +96,7 @@ async function closeClient(item) {
 async function launchClient(name, endpoint, token, configureInUi = false) {
   const dir = join(root, name);
   await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, "application.json"), JSON.stringify({backend:"server",close_behavior:"quit"}));
   const configPath = join(dir, "connection.json");
   let config;
   try {
@@ -107,7 +108,7 @@ async function launchClient(name, endpoint, token, configureInUi = false) {
   const debugPort = await port();
   const child = launch(
     "pomo-restbank.exe",
-    ["--preview", "--profile", name, "--data-dir", dir],
+    ["--backend", "server", "--preview", "--profile", name, "--data-dir", dir],
     {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
     },

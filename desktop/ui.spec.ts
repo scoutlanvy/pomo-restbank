@@ -32,8 +32,8 @@ function nativeIPC(cmd,args){
  }
 }
 window._commands=[];window._historyRequests=0;window._retryRequests=0;window._holdCommand=false;
-window._view={snapshot:{state:{revision:1,tick_sequence:0,mode:'pomodoro',subject:'Umum',status:'idle',timer:null,balance_seconds:300,cycle_position:0,shared_progress:0,per_subject_progress:{},settings:{focus_scope:'shared',tick_sound:false,tick_volume:100},subjects:['Umum','English','Programming'],focus_seconds:1500,alarm_id:null},server_time_ms:Date.now(),storage_error:null,preview:false},connection:'connected',endpoint:'ws://127.0.0.1:4317/v1/ws',has_token:true,pending:null,error:null,profile:'test',preview:false,...${JSON.stringify(overrides)}};
-_mockIPC((cmd,args)=>{if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
+window._view={snapshot:{state:{revision:1,tick_sequence:0,mode:'pomodoro',subject:'Umum',status:'idle',timer:null,balance_seconds:300,cycle_position:0,shared_progress:0,per_subject_progress:{},settings:{focus_scope:'shared',tick_sound:false,tick_volume:100},subjects:['Umum','English','Programming'],focus_seconds:1500,alarm_id:null},server_time_ms:Date.now(),storage_error:null,preview:false},connection:'connected',endpoint:'ws://127.0.0.1:4317/v1/ws',has_token:true,pending:null,error:null,profile:'test',preview:false,};window._defaultSnapshot=window._view.snapshot;Object.assign(window._view,${JSON.stringify(overrides)});
+_mockIPC((cmd,args)=>{if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='save_application_preferences'){window._application=args;return null;}if(cmd==='quit_application'){window._quitRequests=(window._quitRequests??0)+1;return null;}if(cmd==='initialize_local'){window._imports=(window._imports??[]);window._imports.push(args);if(window._importError)throw new Error(window._importError);return window._update({initializing:false,import_available:false,snapshot:window._defaultSnapshot,connection:'connected'});}if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
 window._update=async (partial)=>{window._view={...window._view,...partial};await window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'restbank:view',payload:window._view});};
 `;
     await route.fulfill({ response, body: bootstrap + original });
@@ -1137,4 +1137,54 @@ test("compact fractional DPI uses integer physical pixels and small screens scro
   ).toBe(true);
   await page.locator("#full-view").click();
   await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+});
+
+
+test("Local settings hide connection credentials and persist backend/close preferences", async ({page}) => {
+  await mock(page, {backend:"local",next_backend:"local",close_behavior:"tray"});
+  await expect(page.locator("#connection-status")).toContainText("Local");
+  await page.locator("#settings").click();
+  await expect(page.getByRole("textbox", {name:"Server address"})).toBeHidden();
+  await expect(page.locator("#close-behavior")).toHaveValue("tray");
+  await page.locator("#backend-mode").selectOption("server");
+  await page.locator("#close-behavior").selectOption("quit");
+  await page.getByRole("button",{name:"Save application settings",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=> (window as any)._application)).toEqual({backend:"server",closeBehavior:"quit"});
+  await page.evaluate(()=> (window as any)._update({next_backend:"server",close_behavior:"quit"}));
+  await expect(page.locator("#mode-status")).toContainText("Quit application");
+  await page.getByRole("button",{name:"Quit application",exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=> (window as any)._quitRequests)).toBe(1);
+});
+
+test("Mode switch locks while running/pending but close preference remains available", async ({page}) => {
+  await mock(page,{backend:"local",next_backend:"local"});
+  await page.evaluate(()=> {const w=window as any;return w._update({snapshot:{...w._view.snapshot,state:{...w._view.snapshot.state,status:'running'}}});});
+  await page.locator("#settings").click();
+  await expect(page.locator("#backend-mode")).toBeDisabled();
+  await expect(page.locator("#close-behavior")).toBeEnabled();
+  await page.evaluate(()=> (window as any)._update({connection:'disconnected',pending:null,backend:'server'}));
+  await expect(page.locator("#backend-mode")).toBeEnabled();
+  await page.evaluate(()=> (window as any)._update({pending:'in-flight'}));
+  await expect(page.locator("#backend-mode")).toBeDisabled();
+});
+
+test("First Local launch imports once and retries a busy source without losing the choice", async ({page}) => {
+  await mock(page,{backend:"local",next_backend:"local",initializing:true,import_available:true,snapshot:null,connection:'disconnected'});
+  await expect(page.getByRole('heading',{name:'Start your Local timer'})).toBeVisible();
+  await page.evaluate(()=> (window as any)._importError='Stop the source server, then Retry.');
+  await page.getByRole('button',{name:'Import existing data',exact:true}).click();
+  await expect(page.locator('#dialog-error')).toContainText('Stop the source server');
+  await expect(page.getByRole('button',{name:'Retry import',exact:true})).toBeEnabled();
+  await page.evaluate(()=> (window as any)._importError=null);
+  await page.getByRole('button',{name:'Retry import',exact:true}).click();
+  await expect(page.locator('dialog')).not.toBeVisible();
+  await expect(page.locator('#primary')).toBeVisible();
+  await expect.poll(()=>page.evaluate(()=> (window as any)._imports)).toEqual([{import:true},{import:true}]);
+});
+
+test("Cancel Local setup quits without initializing a database", async ({page}) => {
+  await mock(page,{backend:"local",initializing:true,import_available:true,snapshot:null,connection:'disconnected'});
+  await page.getByRole('button',{name:'Cancel and quit',exact:true}).click();
+  await expect.poll(()=>page.evaluate(()=> (window as any)._quitRequests)).toBe(1);
+  expect(await page.evaluate(()=> (window as any)._imports)).toBeUndefined();
 });

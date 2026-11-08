@@ -2,7 +2,7 @@
 
 **Bangun fokus. Tabung waktu istirahat.**
 
-Aplikasi timer Windows dengan server sinkronisasi Rust. Versi ini merupakan rebuild FokusSaldo di repository baru; aplikasi Python dan data lamanya tidak dipakai atau diubah.
+Aplikasi timer Windows dengan mode Lokal bawaan dan mode Server Rust opsional. Versi ini merupakan rebuild FokusSaldo di repository baru; aplikasi Python dan data lamanya tidak dipakai atau diubah.
 
 ## Menjalankan
 
@@ -16,20 +16,30 @@ npm.cmd --prefix desktop run release
 .\dist\PomoRestbank-Launcher.exe
 ```
 
-Build melewati penyalinan executable klien/server jika isinya identik, sehingga server aktif yang tidak berubah tidak menghalangi packaging. Jika executable berubah dan sedang dipakai, tutup proses yang memakai file tersebut lalu ulangi build; skrip tidak menghentikan proses secara otomatis.
+Build menghasilkan aplikasi, launcher Rust, server opsional, installer NSIS, dan ZIP portable di `dist/`. Buka `pomo-restbank.exe` atau `PomoRestbank-Launcher.exe`: **mode Lokal menjadi default**, termasuk setelah memperbarui instalasi lama. Timer dan SQLite berjalan di dalam aplikasi tanpa proses server terpisah atau port jaringan. Installer yang memasang klien saja sudah cukup untuk mode Lokal; Node.js hanya diperlukan untuk build.
 
-Launcher menjalankan server lokal jika belum aktif, menyiapkan koneksi untuk profil baru, lalu membuka aplikasi. Menutup jendela tidak menghentikan server maupun timer yang sedang berjalan.
+Build melewati executable yang identik. Jika executable berubah dan sedang dipakai, pilih **Quit** pada aplikasi yang memakai file itu sebelum build ulang; packaging tidak menghentikan proses otomatis. Server perlu dihentikan terpisah saat mengganti executable server.
 
-Untuk dua jendela, gunakan profil berbeda:
+### Data Lokal, impor, dan menutup aplikasi
+
+Database Lokal berada di `%LOCALAPPDATA%\PomoRestbank\local\restbank.sqlite3`; preview memakai `preview-local`. Jika data server Pomo Restbank ada di laptop ini, pembukaan Lokal pertama menawarkan **Import existing data**, **Start fresh**, atau **Cancel and quit** sebelum membuat data Lokal. Hentikan server sumber sebelum impor. Impor membuat cadangan `server-backup-*.sqlite3` bertanggal di direktori Lokal, lalu menyalin subject, seluruh riwayat, saldo, progres, pengaturan, dan checkpoint timer. Timer yang belum selesai dibuka paused. Database server dan kredensial lama tetap dipertahankan. Impor tidak menimpa database Lokal yang sudah ada. Data Lokal dan Server berjalan terpisah sesudahnya; impor lewat jaringan dan dari aplikasi Python tidak tersedia.
+
+Satu jendela Lokal berjalan untuk setiap direktori data normal/preview; membuka aplikasi lagi menampilkan jendela yang sudah berjalan, termasuk dari tray. Default tombol **X masuk system tray**: timer, bunyi tik, dan alarm penyelesaian tetap aktif. Menu tray menyediakan **Open** dan **Quit**. Ubah **Settings → Application → When closing the window** jika X harus keluar. Quit menyimpan checkpoint Lokal paused dan menghentikan bunyi. Waktu aplikasi berhenti tidak dihitung; alarm lama tidak diputar kembali. Jika tray gagal dibuat, jendela tetap terlihat; gunakan **Quit application** di Settings.
+
+### Mode Server opsional
+
+Pilih **Settings → Application → Connection mode → Server**, simpan, lalu **Quit application** dan buka lagi. Pilihan disimpan. Perpindahan mode membutuhkan tidak ada perintah pending dan timer Idle ketika terhubung. Klien Server yang terputus boleh berpindah jika tidak ada pending; ini tidak menghentikan timer remote. Dalam mode Server, launcher menyalakan server lokal dan menyiapkan koneksi profil baru jika diperlukan. Membuka klien langsung memungkinkan koneksi ke komputer server lain lewat **Your sync connection**. Pengaturan koneksi lama tetap disimpan saat memakai Lokal.
+
+Untuk dua jendela mode Server, gunakan profil berbeda:
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --profile first
-.\dist\PomoRestbank-Launcher.exe --profile second
+.\dist\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
-Tambahkan `--preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Bisa juga klik dua kali `PomoRestbank-Launcher.exe`; pengguna tidak memerlukan Node.js atau skrip PowerShell. Launcher harus berada di samping executable klien dan server. Installer NSIS hanya memasang klien; gunakan ZIP portable untuk launcher dan server.
+Tambahkan `--preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Bisa juga klik dua kali `PomoRestbank-Launcher.exe`; pengguna tidak memerlukan Node.js atau skrip PowerShell. Launcher harus berada di samping executable klien; mode Server lokal juga memerlukan executable server. Installer NSIS sudah cukup untuk Lokal; ZIP portable menyertakan launcher dan server.
 
-Menjalankan executable secara langsung juga bisa. Di Settings, masukkan alamat server dan token dari `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Token preview ada di `preview-server\token.txt`. Jaga kerahasiaan token dan `connection.json` profil klien.
+Menjalankan klien Server langsung juga bisa dengan `pomo-restbank.exe --backend server`. Untuk Lokal preview cukup `PomoRestbank-Launcher.exe --preview`. Klien dan server menerima `--data-dir PATH` untuk pengujian terisolasi; `--backend local|server` pada klien/launcher mengganti pilihan mode hanya untuk pemanggilan tersebut. Di Settings, masukkan alamat server dan token dari `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Token preview ada di `preview-server\token.txt`. Jaga kerahasiaan token dan `connection.json` profil klien.
 
 ## Alur penggunaan
 
@@ -53,7 +63,7 @@ Klik **Compact mode** di header untuk beralih ke timer ringkas. Fitur ini diakti
 
 Ukuran awal Mode Ringkas adalah 390x560 logical pixels, atau 390x740 ketika Details terbuka, dibatasi area kerja monitor. Jika ruang layar terbatas, konten dapat digulir vertikal. Tema, aturan server, bunyi, dan timer tetap sama dengan tampilan lengkap. Settings serta pesan error/retry tetap tersedia. Aplikasi selalu dibuka dalam tampilan lengkap, dan Details tertutup setiap kali masuk Mode Ringkas. Fitur selalu di atas belum disertakan.
 
-## Sinkronisasi dan pemulihan
+## Sinkronisasi Server dan pemulihan
 
 Satu server memiliki satu timer bersama. Klien yang terhubung dapat mengendalikan timer, dan seluruh klien menerima status yang sama. Perubahan bersamaan dengan status kedaluwarsa ditolak agar tidak saling menimpa.
 
@@ -67,10 +77,10 @@ Server berjalan terpisah. Untuk menghentikan server yang dijalankan langsung dar
 
 ## Data dan batas versi
 
-Data baru disimpan di `%LOCALAPPDATA%\PomoRestbank`: `server`, `preview-server`, `clients\PROFIL`, dan `preview-clients\PROFIL`. Cadangkan direktori server saat server berhenti. Cache klien bukan sumber data utama.
+Data baru disimpan di `%LOCALAPPDATA%\PomoRestbank`: `local`, `preview-local`, `server`, `preview-server`, `clients\PROFIL`, dan `preview-clients\PROFIL`. Cadangkan direktori server saat server berhenti. Cache klien bukan sumber data utama.
 
-LAN dapat diaktifkan dengan server `--listen 0.0.0.0:4317`; klien lain memakai IP LAN server dan token yang sama. Mode ini hanya untuk jaringan pribadi tepercaya, belum untuk internet publik. Android, TLS/hosting publik, kontrol offline, dan impor data Python belum termasuk versi ini.
+LAN dapat diaktifkan dengan server `--listen 0.0.0.0:4317`; klien lain memakai IP LAN server dan token yang sama. Mode ini hanya untuk jaringan pribadi tepercaya, belum untuk internet publik. Android, TLS/hosting publik, penggabungan perubahan offline ke server, dan impor data Python belum termasuk versi ini.
 
-Untuk cache packaging terisolasi, berikan `-BuildDirectory PATH` ke `scripts/Build.ps1`; pilihan ini mengatur output build Cargo, bukan lokasi paket rilis.
+Atur `CARGO_TARGET_DIR` ke direktori milik tugas di Temp untuk memakai ulang cache packaging terisolasi. Lokasi rilis bisa dipilih dengan `npm.cmd --prefix desktop run release -- PATH_OUTPUT_ABSOLUT`. Build fitur ini tersedia di `dist/local-mode/`.
 
 Lihat README.md untuk perintah pengujian, PROJECT_OVERVIEW.md untuk rincian teknis, dan VALIDATION.md untuk hasil pemeriksaan aktual.

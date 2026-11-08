@@ -2,9 +2,9 @@
 
 **Build focus. Bank your breaks.**
 
-A Windows study timer with a shared Rust sync server. Complete Pomodoro targets to earn a break balance, then use that balance when you choose. The native desktop client uses Tauri 2; timer rules, storage, network communication, and audio run in Rust. The UI uses TypeScript and CSS.
+A Windows study timer with built-in Local mode and an optional shared Rust sync server. Complete Pomodoro targets to earn a break balance, then use that balance when you choose. The native desktop client uses Tauri 2; timer rules, storage, network communication, and audio run in Rust. The UI uses TypeScript and CSS.
 
-Pomo Restbank is a new implementation of FokusSaldo. This repository does not replace the Python application or access its existing databases. Android, public hosting/TLS, offline editing, and legacy data import are not included in this first version.
+Pomo Restbank is a new implementation of FokusSaldo. This repository does not replace the Python application or access its existing databases. Android, public hosting/TLS, offline merging with a remote server, and legacy Python data import are not included in this first version.
 
 [Panduan Bahasa Indonesia](README.id.md)
 
@@ -22,27 +22,39 @@ npm.cmd --prefix desktop run release
 .\dist\PomoRestbank-Launcher.exe
 ```
 
-The build creates a release client, a server, and an NSIS installer in `dist/`. Identical client/server executables are left in place, so an already-running unchanged server does not block packaging. If an executable has changed and is in use, close the process using that exact file and rerun the build; the script never stops it automatically. The launcher starts the local server if necessary, configures a new client profile with its token, and opens the client. It does not stop the server when the window closes. You can also double-click `PomoRestbank-Launcher.exe`; users do not need Node.js or PowerShell scripts. The launcher must remain beside both executables. The NSIS installer installs only the client; use the portable ZIP for the launcher and server.
+The build creates the desktop application, Rust launcher, optional server, NSIS installer, and portable ZIP in `dist/`. Open `pomo-restbank.exe` or `PomoRestbank-Launcher.exe`: **Local mode is the default**, including after upgrading an older installation. It runs the timer and SQLite in the desktop process without a separate server or network port. The client-only installer is sufficient for Local mode; Node.js is needed only for building.
+
+Identical executables are left in place. If a changed executable is in use, choose **Quit** on the exact application and rerun the build; packaging never stops processes automatically. A server process must be stopped separately when replacing its executable.
+
+### Local data, import, and closing
+
+Local data lives in `%LOCALAPPDATA%\PomoRestbank\local\restbank.sqlite3`; preview uses `preview-local`. If this laptop already has a Pomo Restbank server database, the first Local launch offers **Import existing data**, **Start fresh**, or **Cancel and quit** before creating Local data. Stop the source server before importing. Import creates a dated `server-backup-*.sqlite3` in the Local directory, copies subjects, all history, balance, progress, settings, and the timer checkpoint, and opens unfinished timers paused. Existing server data and credentials remain unchanged. Import never overwrites an existing Local database. Local and Server data do not synchronize after copying; network import and legacy Python import are not supported.
+
+One Local window runs per normal/preview data directory; reopening the application shows the existing window, even from the tray. Normal and preview remain separate. By default, **X minimizes to the system tray**: timer, tick sounds, and completion alarm remain active. The tray menu offers **Open** and **Quit**. Change **Settings → Application → When closing the window** to quit instead. Quit saves a paused Local checkpoint and stops sounds; reopening does not count time while stopped or replay old alarms. If tray creation fails, the application stays visible; use **Quit application** in Settings.
+
+### Optional Server mode
+
+Choose **Settings → Application → Connection mode → Server**, save, then **Quit application** and reopen. The choice persists; switching modes needs no pending commands and an Idle timer when connected. A disconnected Server client may switch without pending commands; this does not stop the remote timer. The launcher starts the sibling local server and configures a new profile when needed in Server mode. Opening the client directly allows connecting to another server through **Your sync connection**. Existing connection settings are retained when using Local mode.
 
 For two clients on this computer:
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --profile first
-.\dist\PomoRestbank-Launcher.exe --profile second
+.\dist\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
-For short preview sessions and separate data:
+For two preview Server clients with separate data (use only `--preview` for one Local preview window):
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --preview --profile first
-.\dist\PomoRestbank-Launcher.exe --preview --profile second
+.\dist\PomoRestbank-Launcher.exe --backend server --preview --profile first
+.\dist\PomoRestbank-Launcher.exe --backend server --preview --profile second
 ```
 
 You can also start the executables yourself:
 
 ```powershell
 .\dist\pomo-restbank-server.exe
-.\dist\pomo-restbank.exe --profile first
+.\dist\pomo-restbank.exe --backend server --profile first
 ```
 
 Open **Settings → Your sync connection**, enter `ws://127.0.0.1:4317/v1/ws`, and paste the contents of `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Preview uses port 4318 and `preview-server\token.txt`. The server prints the token file location, never the token itself. The client stores the token in its profile's `connection.json`; treat that file as private.
@@ -58,7 +70,7 @@ To stop a server launched by the helper, identify its process by executable path
 - **Progress scope:** Shared across subjects (default) and Per subject retain independent progress. Switching never copies or merges progress. Balance and reward cycle stay shared.
 - **Subjects:** add via +; remove via trash or right-click any subject in the popup. Umum is protected. Confirmation is required; removing a subject preserves history and progress.
 - **History:** Summary by subject and the 30 most recent sessions, displayed in Asia/Jakarta. Visibility starts hidden on each launch.
-- **Sound:** tick On/Off and 0–400% tick volume, independent of the alarm. Preferences are synced; theme and UI state are local. Space pauses/resumes countdowns, ignores inputs and dialogs, and never starts a timer or dismisses an alarm.
+- **Sound:** tick On/Off and 0–400% tick volume, independent of the alarm. Timer preferences are shared in Server mode and stored on this laptop in Local mode; theme and UI state are local. Space pauses/resumes countdowns, ignores inputs and dialogs, and never starts a timer or dismisses an alarm.
 
 Timer updates preserve the field you are editing, keyboard focus, and open subject menus when controls remain available. Manual mode requires a positive duration before Start. Settings retain your draft while controls follow the current timer and connection state. Validation errors remain until you edit the field or retry. Click outside a dialog, use Cancel/Close, or press Escape to dismiss it. Short dialog/menu animations respect your system's reduced-motion preference. Visible History refreshes after reconnection. Commands lock controls immediately without dimming controls that are only waiting for confirmation. A compact Waiting indicator and Retry same command appear in the existing panel header after 300 ms, so quick commands do not flash a banner or move the timer. Settings use the same delayed feedback without replacing your draft.
 
@@ -68,7 +80,7 @@ Use **Compact mode** in the header to switch this window to a small timer view. 
 
 Compact mode starts at 390x560 logical pixels, or 390x740 with Details open, constrained to the monitor work area. Smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
 
-## Sync, disconnection, and recovery
+## Server sync, disconnection, and recovery
 
 One server hosts one private shared timer. Every client can control it while connected. Commands use unique IDs and optimistic revisions; a stale command is rejected with the latest state. Retrying an unacknowledged command uses the same ID and cannot duplicate history, reward, or debit.
 
@@ -85,7 +97,7 @@ Preview server: `%LOCALAPPDATA%\PomoRestbank\preview-server\restbank.sqlite3`.
 Clients: `%LOCALAPPDATA%\PomoRestbank\clients\PROFILE\`, or `preview-clients\PROFILE\`.
 Each profile holds connection configuration, a snapshot cache, and its own WebView storage. Use different profiles for simultaneous clients. Back up the server directory with the server stopped. Client cache is not the authoritative database.
 
-Both executables accept `--data-dir PATH` for isolated testing. Client profiles accept letters, digits, `_`, and `-`. A file lock prevents two servers from using one data directory or two clients from using one profile.
+The server and desktop executables accept `--data-dir PATH` for isolated testing; client `--backend local|server` overrides the saved mode for that invocation. The launcher accepts the same backend override. Preview uses `--preview`. Client profiles accept letters, digits, `_`, and `-`. A file lock prevents two servers from using one data directory or two clients from using one profile.
 
 ```powershell
 $env:CARGO_TARGET_DIR = Join-Path $env:TEMP 'pomo-restbank-dev-build'
@@ -96,6 +108,6 @@ cargo clippy --workspace --all-targets -- -D warnings
 npm.cmd --prefix desktop test
 ```
 
-For an isolated packaging cache, pass `-BuildDirectory PATH` to `scripts/Build.ps1`; this changes Cargo build output, not the release destination.
+Set `CARGO_TARGET_DIR` to a task-owned OS-temp directory to reuse an isolated packaging cache. Set a separate release destination with `npm.cmd --prefix desktop run release -- ABSOLUTE_OUTPUT_PATH`. This feature build is available under `dist/local-mode/`.
 
 UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.
