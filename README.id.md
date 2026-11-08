@@ -47,6 +47,12 @@ Menjalankan executable secara langsung juga bisa. Di Settings, masukkan alamat s
 
 Pembaruan timer mempertahankan input yang sedang diedit, fokus keyboard, dan menu subject yang terbuka selama kontrol masih tersedia. Mode Manual memerlukan durasi positif sebelum Start. Settings mempertahankan draft saat status kontrol mengikuti kondisi timer dan koneksi terbaru. Pesan validasi bertahan sampai input diedit atau dicoba kembali. Klik di luar dialog, gunakan Cancel/Close, atau tekan Escape untuk menutupnya. Animasi singkat dialog/menu mengikuti preferensi reduced motion sistem. History yang terbuka dimuat ulang setelah reconnect. Perintah langsung mengunci kontrol tanpa meredupkan kontrol yang hanya menunggu konfirmasi. Indikator Waiting dan Retry same command muncul pada baris judul panel setelah 300 ms, sehingga perintah cepat tidak memunculkan kilatan banner atau menggeser timer. Settings memakai indikator tertunda yang sama sambil mempertahankan draft.
 
+### Mode Ringkas
+
+Klik **Compact mode** di header untuk beralih ke timer ringkas. Fitur ini diaktifkan secara manual; mengecilkan jendela biasa tidak mengaktifkannya. Mode Ringkas tetap menampilkan subject, mode/sesi, countdown, aksi utama, Reset, dan saldo istirahat. **Details** membuka kontrol istirahat, progres fokus, History, serta Full view di jendela yang sama. Skip break tetap terlihat ketika relevan. **Full view**, termasuk ikon perluas di atas, memulihkan ukuran, posisi, dan status maximize sebelumnya. History juga kembali ke tampilan lengkap dan membuka panel riwayat. Pengubahan mode, subject, dan durasi Manual dilakukan di tampilan lengkap; Start Manual dari Mode Ringkas memakai draft durasi saat ini.
+
+Ukuran awal Mode Ringkas adalah 390x560 logical pixels, atau 390x740 ketika Details terbuka, dibatasi area kerja monitor. Jika ruang layar terbatas, konten dapat digulir vertikal. Tema, aturan server, bunyi, dan timer tetap sama dengan tampilan lengkap. Settings serta pesan error/retry tetap tersedia. Aplikasi selalu dibuka dalam tampilan lengkap, dan Details tertutup setiap kali masuk Mode Ringkas. Fitur selalu di atas belum disertakan.
+
 ## Sinkronisasi dan pemulihan
 
 Satu server memiliki satu timer bersama. Klien yang terhubung dapat mengendalikan timer, dan seluruh klien menerima status yang sama. Perubahan bersamaan dengan status kedaluwarsa ditolak agar tidak saling menimpa.
@@ -64,5 +70,7 @@ Server berjalan terpisah. Untuk menghentikan server yang dijalankan langsung dar
 Data baru disimpan di `%LOCALAPPDATA%\PomoRestbank`: `server`, `preview-server`, `clients\PROFIL`, dan `preview-clients\PROFIL`. Cadangkan direktori server saat server berhenti. Cache klien bukan sumber data utama.
 
 LAN dapat diaktifkan dengan server `--listen 0.0.0.0:4317`; klien lain memakai IP LAN server dan token yang sama. Mode ini hanya untuk jaringan pribadi tepercaya, belum untuk internet publik. Android, TLS/hosting publik, kontrol offline, dan impor data Python belum termasuk versi ini.
+
+Untuk cache packaging terisolasi, berikan `-BuildDirectory PATH` ke `scripts/Build.ps1`; pilihan ini mengatur output build Cargo, bukan lokasi paket rilis.
 
 Lihat README.md untuk perintah pengujian, PROJECT_OVERVIEW.md untuk rincian teknis, dan VALIDATION.md untuk hasil pemeriksaan aktual.

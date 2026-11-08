@@ -62,6 +62,12 @@ To stop a server launched by the helper, identify its process by executable path
 
 Timer updates preserve the field you are editing, keyboard focus, and open subject menus when controls remain available. Manual mode requires a positive duration before Start. Settings retain your draft while controls follow the current timer and connection state. Validation errors remain until you edit the field or retry. Click outside a dialog, use Cancel/Close, or press Escape to dismiss it. Short dialog/menu animations respect your system's reduced-motion preference. Visible History refreshes after reconnection. Commands lock controls immediately without dimming controls that are only waiting for confirmation. A compact Waiting indicator and Retry same command appear in the existing panel header after 300 ms, so quick commands do not flash a banner or move the timer. Settings use the same delayed feedback without replacing your draft.
 
+### Compact mode
+
+Use **Compact mode** in the header to switch this window to a small timer view. This is an explicit toggle; resizing the normal window does not activate it. Compact mode keeps the current subject, mode/session, countdown, primary action, Reset and break balance visible. **Details** expands break controls, focus progress, History and Full view in the same window. Skip break stays visible when applicable. **Full view**, including the expand icon at the top, restores the previous window bounds and maximized state; History also returns to full view and opens the history panel. Mode, subject and Manual duration edits remain in full view; a compact Manual start uses the current draft duration.
+
+Compact mode starts at 390x560 logical pixels, or 390x740 with Details open, constrained to the monitor work area. Smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
+
 ## Sync, disconnection, and recovery
 
 One server hosts one private shared timer. Every client can control it while connected. Commands use unique IDs and optimistic revisions; a stale command is rejected with the latest state. Retrying an unacknowledged command uses the same ID and cannot duplicate history, reward, or debit.
@@ -89,5 +95,7 @@ cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 npm.cmd --prefix desktop test
 ```
+
+For an isolated packaging cache, pass `-BuildDirectory PATH` to `scripts/Build.ps1`; this changes Cargo build output, not the release destination.
 
 UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.
