@@ -36,6 +36,8 @@ type Snapshot = {
   storage_error: string | null;
   preview: boolean;
 };
+type Backend = "local" | "server";
+type CloseBehavior = "tray" | "quit";
 type View = {
   snapshot: Snapshot | null;
   connection: string;
@@ -45,6 +47,13 @@ type View = {
   error: string | null;
   profile: string;
   preview: boolean;
+  backend?: Backend;
+  next_backend?: Backend;
+  close_behavior?: CloseBehavior;
+  initializing?: boolean;
+  import_available?: boolean;
+  tray_available?: boolean;
+  backup_path?: string | null;
 };
 type Session = {
   session_id: string;
@@ -232,7 +241,10 @@ modal.addEventListener("click", (e) => {
   )
     modal.close();
 });
-modal.addEventListener("close", () => dialogReturnFocus?.focus());
+modal.addEventListener("close", () => {
+  dialogReturnFocus?.focus();
+  if (view.initializing && modalContent.querySelector("#local-setup")) call("quit_application");
+});
 function openDialog(title: string, content: string) {
   dialogReturnFocus = document.activeElement as HTMLElement;
   settingsSaveRevision = null;
@@ -392,6 +404,10 @@ function syncDialogControls() {
   const preferences =
     modalContent.querySelector<HTMLFormElement>("#preferences");
   if (!preferences) return;
+  const modeSelect = modalContent.querySelector<HTMLSelectElement>("#backend-mode");
+  if (modeSelect) modeSelect.disabled = Boolean(view.pending || commandSubmitting || (connected() && view.snapshot?.state.status !== "idle"));
+  const modeStatus = modalContent.querySelector<HTMLElement>("#mode-status");
+  if (modeStatus) modeStatus.textContent = view.next_backend && view.next_backend !== view.backend ? "Mode saved. Choose Quit application, then reopen to apply it." : `Active mode: ${view.backend === "local" ? "Local" : "Server"}`;
   const unavailable = !available() || view.snapshot?.state.status !== "idle";
   lockCommandControl(
     preferences.querySelector<HTMLFieldSetElement>("fieldset")!,
@@ -482,14 +498,14 @@ function buildWorkspace() {
 function render() {
   syncLayoutButtons();
   renderBanner();
-  setText(document.querySelector("#profile-label"), `Profile: ${view.profile}`);
+  setText(document.querySelector("#profile-label"), view.backend === "local" ? "Local - This laptop" : `Profile: ${view.profile}`);
   const s = view.snapshot?.state;
   if (!s) {
     if (!workspace.querySelector("#setup")) {
-      workspace.innerHTML = `<section class="welcome panel"><span class="eyebrow">YOUR SPACE TO FOCUS</span><div class="welcome-icon">${icon("cup")}</div><h1>A little focus.<br>A well-earned break.</h1><p>Connect to your Restbank server to start a shared timer and keep your progress together.</p><button id="setup" class="primary">${icon("link")}Connect your timer</button><span class="connection"></span></section>`;
+      workspace.innerHTML = `<section class="welcome panel"><span class="eyebrow">YOUR SPACE TO FOCUS</span><div class="welcome-icon">${icon("cup")}</div><h1>A little focus.<br>A well-earned break.</h1><p>${view.backend === "local" ? "Choose how to start your Local timer. Your server data stays separate." : "Connect to your Restbank server to start a shared timer and keep your progress together."}</p><button id="setup" class="primary">${icon("link")}${view.backend === "local" ? "Set up Local mode" : "Connect your timer"}</button><span class="connection"></span></section>`;
       workspace
         .querySelector("#setup")!
-        .addEventListener("click", () => openSettings(true));
+        .addEventListener("click", () => view.initializing ? openLocalSetup() : openSettings(true));
     }
     const connection = workspace.querySelector(".connection")!;
     connection.className = `connection ${view.connection}`;
@@ -692,6 +708,7 @@ function render() {
   updateCountdown();
 }
 function connectionName() {
+  if (view.backend === "local") return view.initializing ? "Local setup" : "Local";
   return view.connection === "connected"
     ? "Connected"
     : view.connection === "connecting"
@@ -932,13 +949,49 @@ function deleteSubject(name: string) {
     command({ type: "delete_subject", name });
   });
 }
+function applicationSettingsMarkup() {
+  const next = view.next_backend ?? view.backend ?? "server";
+  return `<div class="settings-section"><h3>Application</h3><p id="mode-status" class="muted">Active mode: ${view.backend === "local" ? "Local" : "Server"}</p><form id="application-preferences"><label>Connection mode<select id="backend-mode"><option value="local" ${next === "local" ? "selected" : ""}>Local - this laptop only</option><option value="server" ${next === "server" ? "selected" : ""}>Server - sync across devices</option></select></label><p class="hint">Local needs no separate server. Data stays separate. Changing mode applies after Quit and reopen; it does not stop a remote timer.</p><label>When closing the window<select id="close-behavior"><option value="tray" ${view.close_behavior !== "quit" ? "selected" : ""}>Minimize to tray - timer and alarm stay active</option><option value="quit" ${view.close_behavior === "quit" ? "selected" : ""}>Quit application</option></select></label><div class="dialog-actions"><button class="secondary" type="button" id="quit-application">Quit application</button><button class="primary" type="submit">Save application settings</button></div><p id="application-saved" role="status" class="hint"></p>${view.backup_path ? `<details><summary>Import backup</summary><p class="hint">${escape(view.backup_path)}</p></details>` : ""}</form></div>`;
+}
+function bindApplicationSettings() {
+  document.querySelector("#quit-application")!.addEventListener("click", () => call("quit_application"));
+  document.querySelector("#application-preferences")!.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      await invoke("save_application_preferences", {
+        backend: (document.querySelector("#backend-mode") as HTMLSelectElement).value,
+        closeBehavior: (document.querySelector("#close-behavior") as HTMLSelectElement).value,
+      });
+      document.querySelector("#application-saved")!.textContent = "Saved. A mode change applies after Quit and reopen.";
+    } catch (error) { showError(String(error)); }
+  });
+}
+function openLocalSetup() {
+  openDialog("Start your Local timer", `<div id="local-setup"><p>Keep your subject, history, break balance, and progress by importing the Pomo Restbank server data on this laptop.</p><p class="hint">Stop the source server first. A backup is created; server data is never deleted. The copied timer opens paused. Local and Server data stay separate.</p><div class="dialog-actions"><button class="secondary" id="cancel-local-setup">Cancel and quit</button><button class="secondary" id="fresh-local">Start fresh</button><button class="primary" id="import-local">Import existing data</button></div><p id="import-status" role="status"></p></div>`);
+  let busy = false;
+  const initialize = async (importData: boolean) => {
+    if (busy) return;
+    busy = true;
+    const buttons = modalContent.querySelectorAll<HTMLButtonElement>("#local-setup button");
+    buttons.forEach(button => button.disabled = true);
+    document.querySelector("#import-status")!.textContent = importData ? "Creating backup and importing..." : "Creating Local data...";
+    try { await invoke("initialize_local", { import: importData }); }
+    catch (error) { showError(String(error)); document.querySelector("#import-status")!.textContent = "No existing data was replaced. Fix the issue and Retry."; document.querySelector("#import-local")!.textContent = "Retry import"; }
+    finally { busy = false; buttons.forEach(button => button.disabled = false); }
+  };
+  document.querySelector("#cancel-local-setup")!.addEventListener("click", () => call("quit_application"));
+  document.querySelector("#fresh-local")!.addEventListener("click", () => {
+    initialize(false);
+  });
+  document.querySelector("#import-local")!.addEventListener("click", () => initialize(true));
+}
 function openSettings(connectionOnly = false) {
   settingsSaveRevision = null;
   const s = view.snapshot?.state;
   const editable = canEditSettings();
   openDialog(
     "Make it your space",
-    `<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">Shared with your other connected clients.</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section"><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div>`,
+    `${applicationSettingsMarkup()}<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">${view.backend === "local" ? "Saved on this laptop." : "Shared with your other connected clients."}</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section" ${view.backend === "local" ? "hidden" : ""}><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div>`,
   );
   document
     .querySelector("#cancel-preferences")!
@@ -995,7 +1048,8 @@ function openSettings(connectionOnly = false) {
     .addEventListener("click", () => call("retry_pending"));
   syncDialogControls();
   renderPendingFeedback();
-  if (connectionOnly)
+  bindApplicationSettings();
+  if (connectionOnly && view.backend !== "local")
     document.querySelector<HTMLInputElement>("#endpoint")!.focus();
 }
 async function loadHistory() {
@@ -1086,10 +1140,10 @@ function updateCountdown() {
   if (estimate)
     estimate.textContent = !connected()
       ? remaining === 0
-        ? "Waiting for server"
+        ? view.backend === "local" ? "Waiting for timer" : "Waiting for server"
         : "Estimated · waiting for server"
       : s.status === "running" && (remaining === 0 || elapsed > 2)
-        ? "Waiting for server"
+        ? view.backend === "local" ? "Waiting for timer" : "Waiting for server"
         : "\u00a0";
 }
 document.addEventListener("keydown", (e) => {
@@ -1132,6 +1186,8 @@ function applyView(next: View) {
   view = next;
   syncPendingFeedback();
   render();
+  if (view.initializing && !modal.open) openLocalSetup();
+  if (!view.initializing && modalContent.querySelector("#local-setup")) modal.close();
   if (
     modal.open &&
     settingsSaveRevision !== null &&

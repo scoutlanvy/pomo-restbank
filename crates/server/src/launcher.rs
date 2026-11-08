@@ -14,6 +14,8 @@ use std::{
 struct Args {
     #[arg(long)]
     preview: bool,
+    #[arg(long, value_parser = ["local", "server"])]
+    backend: Option<String>,
     #[arg(long, default_value = "default", value_parser = profile)]
     profile: String,
 }
@@ -68,12 +70,36 @@ fn run(args: Args) -> Result<()> {
     let server = directory.join("pomo-restbank-server.exe");
     let client = directory.join("pomo-restbank.exe");
     anyhow::ensure!(
-        server.is_file() && client.is_file(),
-        "Keep the launcher beside the client and server executables"
+        client.is_file(),
+        "Keep the launcher beside the client executable"
     );
     let root =
         PathBuf::from(std::env::var_os("LOCALAPPDATA").context("LOCALAPPDATA is unavailable")?)
             .join("PomoRestbank");
+    use restbank_engine::preferences::{Backend, Preferences, client_directory};
+    let prefs = Preferences::load(&client_directory(&root, args.preview, &args.profile))?;
+    let backend = match args.backend.as_deref() {
+        Some("server") => Backend::Server,
+        Some("local") => Backend::Local,
+        _ => prefs.backend,
+    };
+    if backend == Backend::Local {
+        let mut command = hidden(client);
+        command.args(["--backend", "local", "--profile", &args.profile]);
+        if args.preview {
+            command.arg("--preview");
+        }
+        command.spawn().context("Cannot start Local application")?;
+        return Ok(());
+    }
+    // Do not start a server for a profile whose Local window is still open.
+    drop(restbank_engine::preferences::lock_profile(
+        &client_directory(&root, args.preview, &args.profile),
+    )?);
+    anyhow::ensure!(
+        server.is_file(),
+        "Server mode needs the sibling server executable"
+    );
     let port = if args.preview { 4318 } else { 4317 };
     if !ready(port) {
         let mut command = hidden(server);
@@ -123,7 +149,7 @@ fn run(args: Args) -> Result<()> {
         }
     }
     let mut command = hidden(client);
-    command.args(["--profile", &args.profile]);
+    command.args(["--backend", "server", "--profile", &args.profile]);
     if args.preview {
         command.arg("--preview");
     }

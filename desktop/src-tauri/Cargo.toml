@@ -10,7 +10,8 @@ custom-protocol = ["tauri/custom-protocol"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 [dependencies]
-tauri = { version = "2", features = [] }
+restbank-engine.workspace = true
+tauri = { version = "2", features = ["tray-icon"] }
 serde.workspace = true
 serde_json.workspace = true
 restbank-domain.workspace = true

@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/domain", "crates/protocol", "crates/server", "desktop/src-tauri"]
+members = ["crates/domain", "crates/engine", "crates/protocol", "crates/server", "desktop/src-tauri"]
 resolver = "2"
 
 [workspace.package]
@@ -8,6 +8,7 @@ edition = "2024"
 license = "MIT"
 
 [workspace.dependencies]
+restbank-engine = { path = "crates/engine" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 uuid = { version = "1", features = ["v4", "serde"] }
