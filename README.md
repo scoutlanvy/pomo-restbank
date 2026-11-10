@@ -78,7 +78,7 @@ Timer updates preserve the field you are editing, keyboard focus, and open subje
 
 Use **Compact mode** in the header to switch this window to a small timer view. This is an explicit toggle; resizing the normal window does not activate it. Compact mode keeps the current subject, mode/session, countdown, primary action, Reset and break balance visible. **Details** expands break controls, focus progress, History and Full view in the same window. Skip break stays visible when applicable. **Full view**, including the expand icon at the top, restores the previous window bounds and maximized state; History also returns to full view and opens the history panel. Mode, subject and Manual duration edits remain in full view; a compact Manual start uses the current draft duration.
 
-Compact mode starts at 390x560 logical pixels, or 390x740 with Details open, constrained to the monitor work area. Smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
+Compact mode starts at 390x480 logical pixels, or 390x740 with Details open, constrained to the monitor work area. Smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
 
 ## Server sync, disconnection, and recovery
 

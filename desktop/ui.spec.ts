@@ -745,7 +745,7 @@ async function enterCompact(page: Page) {
     .getByRole("button", { name: "Enter compact mode", exact: true })
     .click();
   await expect(page.locator("html")).toHaveAttribute("data-layout", "compact");
-  await page.setViewportSize({ width: 390, height: 560 });
+  await page.setViewportSize({ width: 390, height: 480 });
 }
 
 test("compact details share DOM and commands, restore bounds and keep history local", async ({
@@ -764,9 +764,14 @@ test("compact details share DOM and commands, restore bounds and keep history lo
   await expect(page.locator(".topbar")).toBeHidden();
   await expect(page.locator("#compact-details")).toBeHidden();
   await expect(page.locator("#compact-toggle")).toBeVisible();
+  const bottomGap = await page.locator(".compact-footer").evaluate(
+    (footer) => innerHeight - footer.getBoundingClientRect().bottom,
+  );
+  expect(bottomGap).toBeGreaterThanOrEqual(0);
+  expect(bottomGap).toBeLessThanOrEqual(30);
   expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
     width: 390,
-    height: 560,
+    height: 480,
   });
   expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
   await page.locator("#compact-detail-toggle").click();
@@ -832,8 +837,8 @@ test("compact work area clamp, DPI and maximized restore", async ({ page }) => {
   await enterCompact(page);
   const n = await page.evaluate(() => (window as any)._native);
   expect(n.maximized).toBe(false);
-  expect(n.size).toEqual({ width: 584, height: 741 });
-  expect(n.position).toEqual({ x: -900, y: 40 });
+  expect(n.size).toEqual({ width: 584, height: 720 });
+  expect(n.position).toEqual({ x: -900, y: 61 });
   await page.locator("#compact-detail-toggle").click();
   await expect(page.locator("#compact-detail-toggle")).toHaveAttribute(
     "aria-expanded",
@@ -885,7 +890,7 @@ test("failed native resize rolls back without committing the view or sending com
   );
   expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
     width: 390,
-    height: 560,
+    height: 480,
   });
   expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
   await page.evaluate(() => {
@@ -1116,7 +1121,7 @@ test("compact fractional DPI uses integer physical pixels and small screens scro
   await enterCompact(page);
   expect(await page.evaluate(() => (window as any)._native.size)).toEqual({
     width: 488,
-    height: 700,
+    height: 600,
   });
   await page.setViewportSize({ width: 360, height: 400 });
   await page.locator("#compact-detail-toggle").click();

@@ -61,7 +61,7 @@ Pembaruan timer mempertahankan input yang sedang diedit, fokus keyboard, dan men
 
 Klik **Compact mode** di header untuk beralih ke timer ringkas. Fitur ini diaktifkan secara manual; mengecilkan jendela biasa tidak mengaktifkannya. Mode Ringkas tetap menampilkan subject, mode/sesi, countdown, aksi utama, Reset, dan saldo istirahat. **Details** membuka kontrol istirahat, progres fokus, History, serta Full view di jendela yang sama. Skip break tetap terlihat ketika relevan. **Full view**, termasuk ikon perluas di atas, memulihkan ukuran, posisi, dan status maximize sebelumnya. History juga kembali ke tampilan lengkap dan membuka panel riwayat. Pengubahan mode, subject, dan durasi Manual dilakukan di tampilan lengkap; Start Manual dari Mode Ringkas memakai draft durasi saat ini.
 
-Ukuran awal Mode Ringkas adalah 390x560 logical pixels, atau 390x740 ketika Details terbuka, dibatasi area kerja monitor. Jika ruang layar terbatas, konten dapat digulir vertikal. Tema, aturan server, bunyi, dan timer tetap sama dengan tampilan lengkap. Settings serta pesan error/retry tetap tersedia. Aplikasi selalu dibuka dalam tampilan lengkap, dan Details tertutup setiap kali masuk Mode Ringkas. Fitur selalu di atas belum disertakan.
+Ukuran awal Mode Ringkas adalah 390x480 logical pixels, atau 390x740 ketika Details terbuka, dibatasi area kerja monitor. Jika ruang layar terbatas, konten dapat digulir vertikal. Tema, aturan server, bunyi, dan timer tetap sama dengan tampilan lengkap. Settings serta pesan error/retry tetap tersedia. Aplikasi selalu dibuka dalam tampilan lengkap, dan Details tertutup setiap kali masuk Mode Ringkas. Fitur selalu di atas belum disertakan.
 
 ## Sinkronisasi Server dan pemulihan
 

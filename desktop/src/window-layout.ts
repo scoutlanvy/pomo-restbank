@@ -69,7 +69,7 @@ export class WindowLayout {
           available.width,
         ),
         Math.min(
-          target?.size.height ?? Math.round((details ? 740 : 560) * scale),
+          target?.size.height ?? Math.round((details ? 740 : 480) * scale),
           available.height,
         ),
       );

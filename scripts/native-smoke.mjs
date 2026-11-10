@@ -239,7 +239,7 @@ try {
     Math.abs(compactBounds.size.width / compactBounds.scale - 390) <= 2,
   );
   assert.ok(
-    Math.abs(compactBounds.size.height / compactBounds.scale - 560) <= 2,
+    Math.abs(compactBounds.size.height / compactBounds.scale - 480) <= 2,
   );
   await a.page.screenshot({
     path: join(root, "native-compact-light.png"),
