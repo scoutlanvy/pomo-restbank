@@ -16,6 +16,7 @@ function nativeIPC(cmd,args){
  if(n.fail===key){n.fail=null;throw new Error('Simulated window failure');}
  const val=args?.value?.toJSON?.();const v=val?.Physical??val?.Logical;
  switch(key){
+ case 'set_theme':n.theme=args.value;return;
  case 'is_maximized':return n.maximized;
  case 'inner_size':return {...n.size};
  case 'outer_size':return {width:n.size.width+16,height:n.size.height+39};
@@ -45,12 +46,16 @@ test("minimal timer stays usable in both themes and narrow window", async ({
   page,
 }) => {
   await mock(page);
+  await expect.poll(() => page.evaluate(() => (window as any)._native.theme)).toBe("light");
   await expect(page.locator("#countdown")).toHaveText("00:25:00");
   await page.screenshot({
     path: join(tmpdir(), "pomo-restbank-ui-light.png"),
     fullPage: true,
   });
   await page.getByRole("button", { name: "Toggle color theme" }).click();
+  await expect.poll(() => page.evaluate(() => (window as any)._native.theme)).toBe("dark");
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => (window as any)._native.theme)).toBe("dark");
   await page.screenshot({
     path: join(tmpdir(), "pomo-restbank-ui-dark.png"),
     fullPage: true,

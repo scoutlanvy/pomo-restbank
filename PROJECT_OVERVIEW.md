@@ -38,6 +38,8 @@ Each profile owns a SQLite snapshot cache, connection.json, file lock, and isola
 
 ## UI and audio
 
+The frontend applies the saved light/dark theme (or the initial system preference) to both the document and the native Tauri window at startup and on theme toggles. Native setTheme calls are serialized and use the narrowly scoped core:window:allow-set-theme capability so the Windows title bar follows the UI. Native failures are logged without interrupting timer controls.
+
 The main view centers a countdown ring with mode/subject selection, Pause/Resume/Reset, target and break cards, explicit break choices, and optional History. Settings uses a native HTML dialog with Escape/cancel semantics. Custom subject popover supports per-row right-click Remove, preserves selection while context menu is open, and returns to the list on Escape. Text from subject/history data is escaped before rendering. The CSP prevents arbitrary remote UI scripts; network access is in Rust.
 
 The timer workspace keeps stable DOM controls across snapshots, ticks, and heartbeat notifications. Updates patch text, disabled states, subject selection, and ring offset instead of recreating the panel; manual input drafts, keyboard focus, and open subject menus survive unrelated updates. Subject rows rebuild only when the collection changes, and handlers read the latest snapshot. History controls remain stable and its list rerenders only when history, tab, or connection changes; visible history reloads on reconnection, revision, or endpoint changes. Date formatting reuses one Asia/Jakarta formatter.

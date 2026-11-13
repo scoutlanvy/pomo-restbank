@@ -199,6 +199,13 @@ try {
   report.checks.push(
     "native Settings saves connection/token; two clients authenticate and render",
   );
+  const verifyWindowTheme = async (page) => {
+    await until(() => page.evaluate(async () => {
+      const native = await window.__TAURI_INTERNALS__.invoke("plugin:window|theme", { label: "main" });
+      return native === document.documentElement.dataset.theme;
+    }), "native window theme matches UI");
+  };
+  await verifyWindowTheme(a.page);
   const geometry = (page) =>
     page.evaluate(async () => {
       const api = window.__TAURI_INTERNALS__;
@@ -248,6 +255,8 @@ try {
   await layout(a.page, "#compact-detail-toggle", "compact", true);
   report.compact.expandedBounds = await geometry(a.page);
   await a.page.evaluate(() => document.querySelector("#theme").click());
+  await verifyWindowTheme(a.page);
+  report.checks.push("native window theme follows UI at startup and after toggle");
   await a.page.screenshot({
     path: join(root, "native-compact-details-dark.png"),
     fullPage: true,

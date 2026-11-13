@@ -1,6 +1,7 @@
 import "./style.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { WindowLayout } from "./window-layout";
 
 type Mode = "manual" | "pomodoro";
@@ -215,13 +216,24 @@ function syncLayoutButtons() {
       button.disabled = layoutChanging;
     });
 }
-let theme =
-  localStorage.getItem("restbank:theme") ??
-  (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-document.documentElement.dataset.theme = theme;
+const savedTheme = localStorage.getItem("restbank:theme");
+let theme: "dark" | "light" =
+  savedTheme === "dark" || savedTheme === "light"
+    ? savedTheme
+    : matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+let nativeThemeUpdate = Promise.resolve();
+function applyTheme() {
+  document.documentElement.dataset.theme = theme;
+  const selected = theme;
+  // Serialize native updates so rapid toggles keep the final selected theme.
+  nativeThemeUpdate = nativeThemeUpdate
+    .then(() => getCurrentWindow().setTheme(selected))
+    .catch((error) => console.error("Could not update window theme:", error));
+}
+applyTheme();
 document.querySelector("#theme")!.addEventListener("click", () => {
   theme = theme === "dark" ? "light" : "dark";
-  document.documentElement.dataset.theme = theme;
+  applyTheme();
   localStorage.setItem("restbank:theme", theme);
 });
 document

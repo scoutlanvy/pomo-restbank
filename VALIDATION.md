@@ -1,5 +1,17 @@
 # Validation — Pomo Restbank 0.1.0
 
+## Windows title-bar theme - 13 November 2026 (Asia/Jakarta)
+
+The native title bar now follows the saved frontend light/dark theme at startup and on toggles, using Tauri setTheme with an explicit window capability. Native updates are serialized; timer behavior is unchanged. Both READMEs and PROJECT_OVERVIEW.md describe this behavior.
+
+Frontend production build, all 39 Edge/Playwright tests, all 30 Rust tests, workspace rustfmt, and all-target Clippy with warnings denied passed. UI coverage checks native theme requests at startup, on toggle, and after reloading a saved dark theme. The first UI run exposed an incorrect mock argument (theme instead of value); the corrected full suite passed.
+
+The isolated debug native smoke run passed all 12 scenarios, including querying the real Tauri window theme at startup and after a toggle. Report/screenshots are retained in OS-temp pomo-restbank-native-XkL7nV; normal teardown removed its test databases/tokens. WebView2 emitted class-unregistration diagnostics during teardown without failing the checks. An earlier smoke invocation ran before the debug executable existed and failed with ENOENT; its task-owned directory pomo-restbank-native-hYVVDv remains, including isolated test data. No running server from that invocation remained. No legacy or normal user database was accessed.
+
+Release packaging succeeded into ignored dist/titlebar/: client, server, launcher, NSIS installer, portable ZIP and SHA-256 manifest. The already installed/running client was not replaced. Interactive installer execution was not tested; native checks above used the debug build.
+
+After packaging, the verified task-owned OS-temp Cargo target pomo-restbank-titlebar-20261113 was removed after checking its build contents and confirming no build or application used it: 7,470,933,910 bytes (6.96 GiB) cleaned. Release files, the passing native evidence and the failed invocation's isolated test data remain. Earlier tasks' artifacts and shared dependency caches were left untouched.
+
 Verified on Windows, 7 November 2026 (Asia/Jakarta).
 
 ## Compact mode verification

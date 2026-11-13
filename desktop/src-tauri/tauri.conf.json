@@ -30,6 +30,7 @@
           "permissions": [
             "core:default",
             "core:window:allow-close",
+            "core:window:allow-set-theme",
             "core:window:allow-set-size",
             "core:window:allow-set-min-size",
             "core:window:allow-set-position",
