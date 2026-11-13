@@ -84,3 +84,8 @@ LAN dapat diaktifkan dengan server `--listen 0.0.0.0:4317`; klien lain memakai I
 Atur `CARGO_TARGET_DIR` ke direktori milik tugas di Temp untuk memakai ulang cache packaging terisolasi. Lokasi rilis bisa dipilih dengan `npm.cmd --prefix desktop run release -- PATH_OUTPUT_ABSOLUT`. Build fitur ini tersedia di `dist/local-mode/`.
 
 Lihat README.md untuk perintah pengujian, PROJECT_OVERVIEW.md untuk rincian teknis, dan VALIDATION.md untuk hasil pemeriksaan aktual.
+
+
+Tampilan lengkap memakai timer terpusat, satu dropdown Break balance (Use all / Choose duration), dan satu ikon Settings di header. Kartu Focus target tidak ditampilkan di tampilan lengkap; aturan progres dan hadiah tetap sama. Details mode ringkas tetap tersedia.
+
+Menu Break balance mengikuti lebar tombol dan menampilkan pilihan Use all / Choose duration dengan ikon. Membuka menu tidak memulai istirahat.

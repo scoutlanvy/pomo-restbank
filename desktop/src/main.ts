@@ -441,13 +441,11 @@ function syncDialogControls() {
 function buildWorkspace() {
   renderedSubjects = "";
   renderedHistory = undefined;
-  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong id="balance"></strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong><span id="focus-progress"></span> <small id="focus-total"></small></strong></div></div></div><progress class="compact-target-progress compact-only" aria-label="Focus target progress" max="1" value="0"></progress><p class="scope-note"></p><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">Choose duration</button></div><div class="panel-bottom"><button id="compact-history" class="text-button compact-only">${icon("history")}History</button><button id="full-view" class="text-button compact-only">${icon("expand")}Full view</button><button id="history-toggle" class="text-button"></button><button id="timer-settings" class="text-button">${icon("settings")}Settings</button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
+  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="stat-grid"><div class="stat-card"><span class="stat-icon">${icon("cup")}</span><div><span class="stat-label">Break balance</span><strong id="balance"></strong></div></div><div class="stat-card"><span class="stat-icon">${icon("target")}</span><div><span class="stat-label">Focus target</span><strong><span id="focus-progress"></span> <small id="focus-total"></small></strong></div></div></div><progress class="compact-target-progress compact-only" aria-label="Focus target progress" max="1" value="0"></progress><p class="scope-note"></p><div class="balance-control"><button id="balance-toggle" class="secondary" popovertarget="balance-menu" aria-expanded="false" aria-controls="balance-menu">${icon("cup")}Break balance <strong id="balance-value"></strong>${icon("chevron")}</button><div id="balance-menu" popover="auto" aria-label="Break options"><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">${icon("clock")}<span>Choose duration\u2026</span>${icon("chevron")}</button></div></div></div><div class="panel-bottom"><button id="compact-history" class="text-button compact-only">${icon("history")}History</button><button id="full-view" class="text-button compact-only">${icon("expand")}Full view</button><button id="history-toggle" class="text-button"></button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
   workspace
     .querySelector("#connection-status")!
     .addEventListener("click", () => openSettings(true));
-  workspace
-    .querySelector("#timer-settings")!
-    .addEventListener("click", () => openSettings());
+
   workspace
     .querySelectorAll<HTMLButtonElement>("[data-mode]")
     .forEach((button) => {
@@ -471,6 +469,20 @@ function buildWorkspace() {
   workspace
     .querySelector("#compact-history")!
     .addEventListener("click", () => changeLayout(false, false, true));
+  const balanceMenu = workspace.querySelector<HTMLElement>("#balance-menu")!;
+  balanceMenu.addEventListener("toggle", () => {
+    workspace.querySelector("#balance-toggle")!.setAttribute("aria-expanded", String(balanceMenu.matches(":popover-open")));
+  });
+  balanceMenu.addEventListener("keydown", (event) => {
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const buttons = Array.from(balanceMenu.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    buttons[(index + (event.key === "ArrowDown" ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+  });
+  balanceMenu.addEventListener("click", (event) => {
+    if ((event.target as HTMLElement).closest("button")) balanceMenu.hidePopover();
+  });
   setupSubjects();
   setupDuration();
   workspace.querySelector("#primary")!.addEventListener("click", primary);
@@ -618,6 +630,10 @@ function render() {
     else if (!compact && element.parentElement === detailRegion)
       detailRegion.before(element);
   }
+  const breakActions = workspace.querySelector<HTMLElement>(".break-actions")!;
+  const menu = workspace.querySelector<HTMLElement>("#balance-menu")!;
+  if (!compact && breakActions.parentElement !== menu) menu.append(breakActions);
+  if (compact && menu.matches(":popover-open")) menu.hidePopover();
   detailRegion.hidden = !compact || !compactDetails;
   const connection =
     workspace.querySelector<HTMLButtonElement>("#connection-status")!;
@@ -689,6 +705,12 @@ function render() {
   skip.hidden = s.timer?.phase !== "break";
   lockCommandControl(skip, !available() || s.status !== "running");
   setText(workspace.querySelector("#balance"), formatTime(s.balance_seconds));
+  setText(workspace.querySelector("#balance-value"), formatTime(s.balance_seconds));
+  const balanceToggle = workspace.querySelector<HTMLButtonElement>("#balance-toggle")!;
+  lockCommandControl(balanceToggle, !available() || !canBreak);
+  if (balanceToggle.disabled) workspace.querySelector<HTMLElement>("#balance-menu")!.hidePopover();
+  if (!compact) setMarkup(workspace.querySelector("#break-all")!, `${icon("cup")}<span>Use all \u00b7 ${formatTime(s.balance_seconds)}</span>`);
+  else setMarkup(workspace.querySelector("#break-all")!, `${icon("cup")}Use break balance`);
   setText(workspace.querySelector("#focus-progress"), formatTime(progress(s)));
   setText(
     workspace.querySelector("#focus-total"),

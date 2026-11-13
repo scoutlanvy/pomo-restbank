@@ -131,3 +131,21 @@ The initial release cache under pomo-local-mode-20261108 lost generated dependen
 Final release checks also passed against dist/local-mode/: the client/server/launcher and NSIS installer were built, the Local native suite exercised saving mode/close preferences through the real Settings UI, all 11 Server native scenarios passed, and default Local plus preview Server launcher checks passed. Normal Server launcher remains skipped for the occupied 4317 port. The final Cargo workspace suite, rustfmt and Clippy passed in the fresh build target. Reports and Local screenshots are retained alongside the feature distribution.
 
 Task cleanup of verified build/report directories was rejected by automatic approval review with "blocked by policy". No alternate deletion method was attempted. Remaining task-owned Temp directories: pomo-local-mode-20261108, pomo-local-release-10fa33b8, pomo-local-native-GcATKi, pomo-local-native-mjQZK9, pomo-local-native-SqY9Hd, pomo-local-native-nNJZVt, pomo-restbank-native-4WkiHE, pomo-restbank-native-3ltXQS, and pomo-restbank-native-Ec4Goj. Test databases/tokens within native roots were already removed by normal test teardown; remaining native roots contain reports/screenshots. Earlier tasks' Temp artifacts were left untouched.
+
+## Centered full UI - 13 November 2026
+
+Branch feat/centered-timer-ui. Full view uses a centered timer, hides Focus target and scope display, combines balance and break controls in one HTML popover, and exposes Settings only through the header. Compact Details reuses existing controls. No protocol, database or timer rules changed.
+
+Frontend production build, all 41 UI tests, all 30 Rust tests, rustfmt and all-target Clippy with warnings denied passed. Updated tests open the balance dropdown before choosing actions and use the remaining header Settings control. Coverage includes viewport fit at 1440x830 and 680x850, live balance changes without dismissing the menu, Escape, disconnection, duration validation, both themes and compact regressions.
+
+Executables are prepared in ignored dist/centered-timer-ui/ without an installer. No user application is replaced. The task-owned OS-temp Cargo target pomo-restbank-compact-scroll-20261113 is reused and retained; no cache cleanup was performed (0 bytes). Shared caches and previous releases remain.
+
+All 13 native smoke scenarios passed against dist/centered-timer-ui/, including normal Local full-view fit, one Settings entry, compact regression and opening/closing the break dropdown through real Rust IPC and WebView2. Evidence remains in OS-temp pomo-restbank-native-CmeP6j; test databases/tokens were removed by teardown. WebView2 emitted class-unregistration diagnostics during teardown without failing checks. Interactive installation was not tested and no installer was created. The branch remains unmerged and unpushed.
+
+## Balance popup refinement - 13 November 2026
+
+On feat/centered-timer-ui, popup width now matches its trigger, rows are 40px high with icons, and keyboard focus uses a 2px outline. Unicode escapes fix the previously literal question-mark separator. Chevron rotates while open. Timer and IPC rules are unchanged.
+
+Frontend build, all 42 UI tests, all 30 Rust tests, rustfmt and all-target Clippy passed. UI geometry/text/keyboard tests cover both themes at widths 390 and 680. All 13 native smoke scenarios passed at 200% scaling with added assertions for matching menu width, compact height and correct separator. Evidence: OS-temp pomo-restbank-native-xFm27W and pomo-dropdown-refined.png. Test data was isolated and removed by smoke teardown. WebView2 class-unregistration diagnostics did not fail checks.
+
+The existing dist/centered-timer-ui/pomo-restbank.exe was running and left untouched. The tested executable is delivered as sibling pomo-restbank-dropdown.exe. No installer, merge or push. Build cache and reports remain; 0 bytes cleaned. Normal user and legacy databases were not opened by tests.

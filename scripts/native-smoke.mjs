@@ -243,6 +243,9 @@ try {
   // A normal Local window reproduces the user's layout without preview's
   // deliberately visible TEST MODE notice, which legitimately needs extra space.
   const normal = await launchClient("normal-compact", endpoint, token, false, true);
+  assert.equal(await normal.page.locator('.stat-grid').isVisible(), false);
+  assert.equal(await normal.page.locator('#timer-settings').count(), 0);
+  assert.ok(await normal.page.evaluate(() => document.documentElement.scrollHeight <= innerHeight), 'normal full view fits');
   await layout(normal.page, "#compact-toggle", "compact", false);
   const compactContent = await normal.page.evaluate(() => ({
     viewport: innerHeight, content: document.documentElement.scrollHeight,
@@ -432,6 +435,15 @@ try {
   await b.page.getByRole("button", { name: "Stop Alarm", exact: true }).click();
   await status(a.page, "choice");
   await status(b.page, "choice");
+  await b.page.locator('#balance-toggle').click();
+  assert.ok(await b.page.locator('#break-choose').isVisible());
+  const triggerBox = await b.page.locator('#balance-toggle').boundingBox();
+  const menuBox = await b.page.locator('#balance-menu').boundingBox();
+  assert.ok(Math.abs(triggerBox.width-menuBox.width) <= 1, 'native menu matches trigger width');
+  assert.ok(menuBox.height <= 96, 'native menu uses compact rows');
+  assert.ok((await b.page.locator('#break-all').textContent()).includes('\u00b7'), 'correct separator');
+  await b.page.keyboard.press('Escape');
+  assert.equal(await b.page.locator('#break-choose').isVisible(), false);
   report.checks.push(
     "completion grants one reward and Stop Alarm syncs across windows",
   );

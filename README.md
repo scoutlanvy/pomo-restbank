@@ -111,3 +111,8 @@ npm.cmd --prefix desktop test
 Set `CARGO_TARGET_DIR` to a task-owned OS-temp directory to reuse an isolated packaging cache. Set a separate release destination with `npm.cmd --prefix desktop run release -- ABSOLUTE_OUTPUT_PATH`. This feature build is available under `dist/local-mode/`.
 
 UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.
+
+
+Full view uses a centered timer, one Break balance dropdown (Use all / Choose duration), and a single Settings icon in the header. Focus target cards are omitted from full view; progress and reward rules are unchanged. Compact Details retains its existing controls.
+
+The Break balance menu follows the button width and shows compact Use all / Choose duration options with icons. Opening it does not start a break.

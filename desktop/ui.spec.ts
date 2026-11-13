@@ -302,10 +302,10 @@ test("heartbeat preserves uncommitted duration, dropdown and dialog return focus
     page.getByRole("option", { name: "English", exact: true }),
   ).toBeVisible();
   await page.keyboard.press("Escape");
-  await page.locator("#timer-settings").click();
+  await page.locator("#settings").click();
   await page.evaluate(() => (window as any)._update({}));
   await page.keyboard.press("Escape");
-  await expect(page.locator("#timer-settings")).toBeFocused();
+  await expect(page.locator("#settings")).toBeFocused();
 });
 
 test("dialog padding preserves drafts while backdrop and Escape dismiss", async ({
@@ -365,6 +365,7 @@ test("local validation survives updates and clears when corrected", async ({
   page,
 }) => {
   await mock(page);
+  await page.locator("#balance-toggle").click();
   await page.locator("#break-choose").click();
   await page.locator("#break-minutes").fill("6");
   await page.locator("#break-form button").click();
@@ -445,6 +446,7 @@ test("persistent action handlers use latest subject, balance and status", async 
     mode: "manual",
     subject: "English",
   });
+  await page.locator("#balance-toggle").click();
   await page.locator("#break-all").click();
   expect(await page.evaluate(() => (window as any)._commands.at(-1))).toEqual({
     type: "start_break",
@@ -1210,4 +1212,54 @@ test("Cancel Local setup quits without initializing a database", async ({page}) 
   await page.getByRole('button',{name:'Cancel and quit',exact:true}).click();
   await expect.poll(()=>page.evaluate(()=> (window as any)._quitRequests)).toBe(1);
   expect(await page.evaluate(()=> (window as any)._imports)).toBeUndefined();
+});
+
+
+test("centered full view fits and balance disclosure preserves timer state", async ({ page }) => {
+  await mock(page);
+  for (const size of [{width:1440,height:830},{width:680,height:850}]) {
+    await page.setViewportSize(size);
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= innerHeight)).toBe(true);
+  }
+  await expect(page.locator('.stat-grid')).toBeHidden();
+  await expect(page.locator('#timer-settings')).toHaveCount(0);
+  await page.locator('#balance-toggle').click();
+  await expect(page.locator('#break-all')).toBeVisible();
+  expect(await page.evaluate(() => (window as any)._commands.length)).toBe(0);
+  await page.evaluate(() => { (window as any)._view.snapshot.state.balance_seconds=120; return (window as any)._update({}); });
+  await expect(page.locator('#break-all')).toContainText('00:02:00');
+  await expect(page.locator('#balance-toggle')).toHaveAttribute('aria-expanded','true');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#break-all')).toBeHidden();
+  await page.locator('#balance-toggle').click();
+  await page.evaluate(() => (window as any)._update({connection:'disconnected'}));
+  await expect(page.locator('#balance-toggle')).toBeDisabled();
+  await expect(page.locator('#break-all')).toBeHidden();
+});
+
+
+test("balance menu matches trigger with compact rows and correct text", async ({ page }) => {
+  await mock(page);
+  for (const theme of ['light','dark']) {
+    await page.evaluate(theme => document.documentElement.dataset.theme=theme,theme);
+    for (const width of [390,680]) {
+      await page.setViewportSize({width,height:850});
+      await page.locator('#balance-toggle').click();
+      await expect(page.locator('#break-all')).toHaveText('Use all \u00b7 00:05:00');
+      await expect(page.locator('#break-choose')).toHaveText('Choose duration\u2026');
+      const trigger = await page.locator('#balance-toggle').boundingBox();
+      const menu = await page.locator('#balance-menu').boundingBox();
+      expect(Math.abs(trigger!.width-menu!.width)).toBeLessThanOrEqual(1);
+      expect(menu!.height).toBeLessThanOrEqual(96);
+      if (theme === 'dark' && width === 680) await page.screenshot({path:join(tmpdir(),'pomo-dropdown-refined.png')});
+      expect(menu!.x).toBeGreaterThanOrEqual(0);
+      expect(menu!.x+menu!.width).toBeLessThanOrEqual(width);
+      await page.locator('#break-all').focus();
+      await page.keyboard.press('ArrowDown');
+      await expect(page.locator('#break-choose')).toBeFocused();
+      await page.keyboard.press('Escape');
+      await page.locator('#balance-toggle').focus();
+      await expect(page.locator('#balance-toggle')).toHaveCSS('outline-width','2px');
+    }
+  }
 });
