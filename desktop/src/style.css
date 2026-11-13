@@ -982,7 +982,7 @@ dialog[open] {
 :root[data-layout="compact"] .timer-face {
   width: 214px;
   height: 214px;
-  margin: 8px auto 16px;
+  margin: 8px auto 6px;
 }
 :root[data-layout="compact"] .countdown {
   font-size: 39px;

@@ -1030,6 +1030,19 @@ for (const theme of ["light", "dark"] as const) {
   }
 }
 
+test("compact default height fits without scrolling and smaller windows can scroll", async ({ page }) => {
+  await mock(page);
+  await enterCompact(page);
+  const measure = () => page.evaluate(() => ({
+    height: innerHeight,
+    content: document.documentElement.scrollHeight,
+  }));
+  const bounds = await measure();
+  expect(bounds, JSON.stringify(bounds)).toMatchObject({ content: bounds.height });
+  await page.setViewportSize({ width: 360, height: 400 });
+  expect((await measure()).content).toBeGreaterThan(400);
+});
+
 test("compact reflects every timer state and preserves break and storage restrictions", async ({
   page,
 }) => {

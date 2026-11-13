@@ -1,5 +1,17 @@
 # Validation — Pomo Restbank 0.1.0
 
+## Compact scrollbar correction - 13 November 2026 (Asia/Jakarta)
+
+Reproduced the reported scrollbar: collapsed compact content measured 487px in a 480px client viewport. Reducing only the compact timer-face bottom margin from 16px to 6px removes the unnecessary overflow. Natural scrolling is retained for smaller windows, notices, and extra controls; no content is hidden to suppress the scrollbar.
+
+The regression test failed against the previous CSS (487px versus 480px), then the frontend build and all 40 Edge/Playwright tests passed with the fix. The new test checks default compact content fits and a 360x400 viewport still overflows vertically. Native smoke now also asserts the default compact viewport fits without vertical scrolling. Both READMEs and PROJECT_OVERVIEW.md describe the corrected layout.
+
+All 30 Rust tests, workspace rustfmt, all-target Clippy with warnings denied, JavaScript syntax checking, and git diff whitespace checks passed. Native tests use only task-owned temporary databases; normal user data and legacy databases are excluded.
+
+Release packaging into dist/titlebar/ succeeded. All 13 native smoke scenarios passed against that release, including a normal Local window at 200% display scaling without vertical overflow. The helper isolates LOCALAPPDATA for this additional normal Local client so existing server data cannot trigger import setup. Preview's TEST MODE notice intentionally adds height and may scroll; it is preserved. Two earlier assertions incorrectly included that notice, and one normal-Local attempt inherited the import-source location and waited at setup; no import was requested or database opened from that source. The final isolated run passed. Reports remain in OS-temp pomo-restbank-native-YxMJtq (passing), pomo-restbank-native-jEHGKw, pomo-restbank-native-Li3k3F, and pomo-restbank-native-OmQIV2 (earlier attempts). Normal teardown removed final-run test databases/tokens; the earlier OmQIV2 normal-compact directory retains only its task-owned setup artifacts. Interactive installation was not exercised.
+
+No cache cleanup was performed for this update (0 bytes cleaned). The task-owned Cargo target under OS-temp pomo-restbank-compact-scroll-20261113 is retained for subsequent builds, along with the reports above and release files in dist/titlebar/. Earlier tasks' artifacts and shared dependency caches were left untouched.
+
 ## Windows title-bar theme - 13 November 2026 (Asia/Jakarta)
 
 The native title bar now follows the saved frontend light/dark theme at startup and on toggles, using Tauri setTheme with an explicit window capability. Native updates are serialized; timer behavior is unchanged. Both READMEs and PROJECT_OVERVIEW.md describe this behavior.

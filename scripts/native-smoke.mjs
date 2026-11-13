@@ -93,10 +93,10 @@ async function closeClient(item) {
     5000,
   );
 }
-async function launchClient(name, endpoint, token, configureInUi = false) {
+async function launchClient(name, endpoint, token, configureInUi = false, local = false) {
   const dir = join(root, name);
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "application.json"), JSON.stringify({backend:"server",close_behavior:"quit"}));
+  await writeFile(join(dir, "application.json"), JSON.stringify({backend:local ? "local" : "server",close_behavior:"quit"}));
   const configPath = join(dir, "connection.json");
   let config;
   try {
@@ -108,9 +108,10 @@ async function launchClient(name, endpoint, token, configureInUi = false) {
   const debugPort = await port();
   const child = launch(
     "pomo-restbank.exe",
-    ["--backend", "server", "--preview", "--profile", name, "--data-dir", dir],
+    ["--backend", local ? "local" : "server", ...(local ? [] : ["--preview"]), "--profile", name, "--data-dir", dir],
     {
       WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debugPort}`,
+      ...(local ? { LOCALAPPDATA: join(root, "isolated-appdata") } : {}),
     },
   );
   await until(async () => {
@@ -239,6 +240,17 @@ try {
   };
   const originalBounds = await geometry(a.page);
   const originalRevision = (await view(a.page)).snapshot.state.revision;
+  // A normal Local window reproduces the user's layout without preview's
+  // deliberately visible TEST MODE notice, which legitimately needs extra space.
+  const normal = await launchClient("normal-compact", endpoint, token, false, true);
+  await layout(normal.page, "#compact-toggle", "compact", false);
+  const compactContent = await normal.page.evaluate(() => ({
+    viewport: innerHeight, content: document.documentElement.scrollHeight,
+  }));
+  assert.ok(compactContent.content <= compactContent.viewport,
+    `normal compact view must fit without a vertical scrollbar: ${JSON.stringify(compactContent)}`);
+  report.checks.push("normal Local compact window fits without a vertical scrollbar");
+  await closeClient(normal);
   await layout(a.page, "#compact-toggle", "compact", false);
   const compactBounds = await geometry(a.page);
   report.compact = { originalBounds, compactBounds };
@@ -497,7 +509,7 @@ try {
   for (const child of children) if (child.exitCode === null) child.kill();
   await wait(500);
   // Retain screenshots/report, but remove our own temporary databases and tokens.
-  for (const name of ["first", "second", "server"])
+  for (const name of ["first", "second", "server", "normal-compact"])
     await rm(join(root, name), {
       recursive: true,
       force: true,
