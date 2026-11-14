@@ -1332,3 +1332,32 @@ test("automatic Details fitting preserves a manually resized window width", asyn
   await expect.poll(() => page.evaluate(() => (window as any)._native.size.width)).toBe(360);
   await expect.poll(() => page.locator("#compact-toggle").isEnabled()).toBe(true);
 });
+
+
+test("Details opens and closes with one native resize and no redundant window move", async ({ page }) => {
+  await mock(page);
+  await enterCompact(page);
+  await page.evaluate(async () => (window as any).__TAURI_INTERNALS__.invoke('plugin:event|emit', {
+    event: 'restbank:history', payload: { type: 'history', sessions: Array.from({ length: 3 }, (_, i) => ({ subject: `Subject ${i}`, recorded_at: '2026-11-14T00:00:00Z', duration_seconds: 1500, mode: 'pomodoro' })), summary: [] },
+  }));
+  const timer = await page.locator('.timer-face').boundingBox();
+  for (const open of [true, false, true, false, true]) {
+    await page.evaluate(() => { (window as any)._native.calls = []; });
+    await page.locator('#compact-detail-toggle').click();
+    await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', String(open));
+    await expect(page.locator('#compact-toggle')).toBeEnabled();
+    // Allow the post-render observer to run so a second resize cannot go unnoticed.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const calls = await page.evaluate(() => (window as any)._native.calls as string[]);
+    expect(calls.filter(call => call === 'set_size')).toHaveLength(1);
+    expect(calls.filter(call => call === 'set_position')).toHaveLength(0);
+    expect(await page.locator('.timer-face').boundingBox()).toEqual(timer);
+    if (open) {
+      const measured = await page.locator('#compact-details').evaluate(el => Math.ceil(el.getBoundingClientRect().bottom + scrollY + 16));
+      expect(await page.evaluate(() => (window as any)._native.size.height)).toBe(measured);
+    } else {
+      expect(await page.evaluate(() => (window as any)._native.size.height)).toBe(480);
+    }
+  }
+  expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
+});

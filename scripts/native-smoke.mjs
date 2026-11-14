@@ -267,9 +267,24 @@ try {
     path: join(root, "native-compact-light.png"),
     fullPage: true,
   });
+  await a.page.evaluate(() => {
+    window._detailResizeSizes = [];
+    window._detailResizeListener = () => window._detailResizeSizes.push({ width: innerWidth, height: innerHeight });
+    window.addEventListener("resize", window._detailResizeListener);
+  });
   await layout(a.page, "#compact-detail-toggle", "compact", true);
   await a.page.locator("#compact-history-list").getByText("No sessions yet.", { exact: true }).waitFor();
   await until(async () => a.page.evaluate(() => Math.abs(innerHeight - document.querySelector("#compact-details").getBoundingClientRect().bottom - 16) <= 2), "Details fits empty history with 16px bottom margin");
+  await a.page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await until(() => a.page.evaluate(() => window._detailResizeSizes.length > 0), "native Details resize event");
+  const detailSizes = await a.page.evaluate(() => {
+    window.removeEventListener("resize", window._detailResizeListener);
+    return window._detailResizeSizes;
+  });
+  assert.equal(new Set(detailSizes.map(size => `${size.width}x${size.height}`)).size, 1, "Details has no intermediate native size");
+  const expandedPosition = (await geometry(a.page)).position;
+  assert.deepEqual(expandedPosition, compactBounds.position, "Details retains the compact position");
+  report.checks.push("native Details has one final resize size and retains its position");
   assert.equal(await a.page.locator(".compact-target-progress").count(), 0);
   report.checks.push("native compact Details fits empty history without Focus target or unused bottom space");
   report.compact.expandedBounds = await geometry(a.page);

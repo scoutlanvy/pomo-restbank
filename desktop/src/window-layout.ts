@@ -74,24 +74,13 @@ export class WindowLayout {
         ),
       );
       await win.setSize(size);
-      await win.setPosition(
-        new PhysicalPosition(
-          Math.max(
-            area.position.x,
-            Math.min(
-              position.x,
-              area.position.x + available.width - size.width,
-            ),
-          ),
-          Math.max(
-            area.position.y,
-            Math.min(
-              position.y,
-              area.position.y + available.height - size.height,
-            ),
-          ),
-        ),
+      const nextPosition = new PhysicalPosition(
+        Math.max(area.position.x, Math.min(position.x, area.position.x + available.width - size.width)),
+        Math.max(area.position.y, Math.min(position.y, area.position.y + available.height - size.height)),
       );
+      // Details only changes height; avoid a redundant Windows move/repaint.
+      if (!this.compact || !compact || nextPosition.x !== before.position.x || nextPosition.y !== before.position.y)
+        await win.setPosition(nextPosition);
       if (target?.maximized) await win.maximize();
       if (compact && !this.compact) this.full = rollback;
       this.compact = compact;

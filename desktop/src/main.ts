@@ -175,7 +175,14 @@ async function changeLayout(
     .querySelectorAll<HTMLElement>(":popover-open")
     .forEach((p) => p.hidePopover());
   try {
-    await windowLayout.change(nextCompact, details);
+    // Measure the expanded content synchronously before the native resize.
+    // Restoring hidden in the same task prevents an intermediate painted layout.
+    let detailsHeight: number | undefined;
+    if (compact && nextCompact && details) {
+      renderCompactHistory();
+      detailsHeight = measureCompactDetails();
+    }
+    await windowLayout.change(nextCompact, details, detailsHeight);
     compact = nextCompact;
     compactDetails = nextCompact && details;
     document.documentElement.dataset.layout = compact ? "compact" : "full";
@@ -184,7 +191,7 @@ async function changeLayout(
       ? workspace.querySelector(".section-top")
       : document.querySelector(".topbar");
     destination?.append(headerActions);
-    lastCompactHeight = null;
+    lastCompactHeight = detailsHeight ?? null;
     if (compact && compactDetails && connected()) void loadHistory();
     if (showHistory) {
       historyVisible = true;
@@ -1075,13 +1082,23 @@ function renderCompactHistory() {
 }
 let compactFitFrame = 0;
 let lastCompactHeight: number | null = null;
+function measureCompactDetails(): number {
+  const details = workspace.querySelector<HTMLElement>("#compact-details")!;
+  const wasHidden = details.hidden;
+  try {
+    details.hidden = false;
+    return Math.max(400, Math.ceil(details.getBoundingClientRect().bottom + scrollY + 16));
+  } finally {
+    details.hidden = wasHidden;
+  }
+}
 function scheduleCompactFit() {
   cancelAnimationFrame(compactFitFrame);
   compactFitFrame = requestAnimationFrame(async () => {
     if (!compact || !compactDetails || layoutChanging) return;
     const details = workspace.querySelector<HTMLElement>("#compact-details");
     if (!details || details.hidden) return;
-    const height = Math.max(400, Math.ceil(details.getBoundingClientRect().bottom + scrollY + 16));
+    const height = measureCompactDetails();
     if (height === lastCompactHeight) return;
     const focused = document.activeElement as HTMLElement | null;
     layoutChanging = true;
