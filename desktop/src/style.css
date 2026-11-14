@@ -15,6 +15,10 @@
   --danger: #b34452;
   color-scheme: light;
 }
+/* Reserve scrollbar space so opening History does not shift centered content. */
+:root:not([data-layout="compact"]) {
+  scrollbar-gutter: stable;
+}
 :root[data-theme="dark"] {
   --bg: #14151e;
   --panel: #1c1d2a;

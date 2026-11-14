@@ -1422,3 +1422,29 @@ test("Details prepares content before native resize and retains pointer/keyboard
   await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'true');
   expect(await page.evaluate(() => document.documentElement.style.overflowY)).toBe('');
 });
+
+
+test("History toggles preserve horizontal layout with and without existing overflow", async ({ page }) => {
+  await mock(page);
+  const geometry = () => page.evaluate(() =>
+    [".topbar", ".timer-panel", "#countdown"].map((selector) => {
+      const rect = document.querySelector(selector)!.getBoundingClientRect();
+      return { x: rect.x, width: rect.width };
+    }),
+  );
+  for (const theme of ["light", "dark"]) {
+    await page.evaluate((value) => { document.documentElement.dataset.theme = value; }, theme);
+    for (const size of [{ width: 1440, height: 830 }, { width: 390, height: 700 }, { width: 390, height: 560 }]) {
+      await page.setViewportSize(size);
+      const before = await geometry();
+      await page.locator("#history-toggle").click();
+      await expect(page.locator("#history-panel")).toBeVisible();
+      expect(await page.evaluate(() => document.documentElement.scrollHeight > innerHeight)).toBe(true);
+      expect(await geometry()).toEqual(before);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.locator("#history-toggle").click();
+      await expect(page.locator("#history-panel")).toBeHidden();
+      expect(await geometry()).toEqual(before);
+    }
+  }
+});
