@@ -18,7 +18,7 @@ export class WindowLayout {
   private full: Bounds | null = null;
   private compact = false;
 
-  async change(compact: boolean, details: boolean): Promise<void> {
+  async change(compact: boolean, details: boolean, detailsHeight?: number): Promise<void> {
     const win = getCurrentWindow();
     const before: Bounds = {
       maximized: await win.isMaximized(),
@@ -65,11 +65,11 @@ export class WindowLayout {
       await win.setMinSize(minimum);
       const size = new PhysicalSize(
         Math.min(
-          target?.size.width ?? Math.round(390 * scale),
+          target?.size.width ?? (detailsHeight === undefined ? Math.round(390 * scale) : rollback.size.width),
           available.width,
         ),
         Math.min(
-          target?.size.height ?? Math.round((details ? 740 : 480) * scale),
+          target?.size.height ?? Math.round((details ? (detailsHeight ?? 600) : 480) * scale),
           available.height,
         ),
       );

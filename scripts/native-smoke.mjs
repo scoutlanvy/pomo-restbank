@@ -268,6 +268,10 @@ try {
     fullPage: true,
   });
   await layout(a.page, "#compact-detail-toggle", "compact", true);
+  await a.page.locator("#compact-history-list").getByText("No sessions yet.", { exact: true }).waitFor();
+  await until(async () => a.page.evaluate(() => Math.abs(innerHeight - document.querySelector("#compact-details").getBoundingClientRect().bottom - 16) <= 2), "Details fits empty history with 16px bottom margin");
+  assert.equal(await a.page.locator(".compact-target-progress").count(), 0);
+  report.checks.push("native compact Details fits empty history without Focus target or unused bottom space");
   report.compact.expandedBounds = await geometry(a.page);
   await a.page.evaluate(() => document.querySelector("#theme").click());
   await verifyWindowTheme(a.page);
@@ -283,7 +287,7 @@ try {
     ),
     true,
   );
-  await layout(a.page, "#full-view", "full");
+  await layout(a.page, "#compact-toggle", "full");
   const restoredBounds = await geometry(a.page);
   report.compact.restoredBounds = restoredBounds;
   const area = restoredBounds.monitor.workArea;
@@ -373,13 +377,17 @@ try {
     path: join(root, "native-compact-details-after-reset.png"),
     fullPage: true,
   });
+  await a.page.locator("#compact-history-list .history-row").first().waitFor();
+  assert.ok(await a.page.locator("#compact-history-list .history-row").count() <= 3);
+  await until(async () => a.page.evaluate(() => Math.abs(innerHeight - document.querySelector("#compact-details").getBoundingClientRect().bottom - 16) <= 2), "Details fits recent history");
+  report.checks.push("native compact History refreshes after Reset and fits recent rows");
   await layout(a.page, "#compact-history", "full");
   assert.equal(await a.page.locator("#history-panel").isVisible(), true);
   report.checks.push(
     "compact Start/Resume/Reset sync with full client; compact History opens full view",
   );
 
-  await a.page.locator(".history-row").first().waitFor();
+  await a.page.locator("#history-list .history-row").first().waitFor();
   report.checks.push(
     "Reset records partial focus and refreshes native history",
   );

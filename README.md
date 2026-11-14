@@ -76,9 +76,9 @@ Timer updates preserve the field you are editing, keyboard focus, and open subje
 
 ### Compact mode
 
-Use **Compact mode** in the header to switch this window to a small timer view. This is an explicit toggle; resizing the normal window does not activate it. Compact mode keeps the current subject, mode/session, countdown, primary action, Reset and break balance visible. **Details** expands break controls, focus progress, History and Full view in the same window. Skip break stays visible when applicable. **Full view**, including the expand icon at the top, restores the previous window bounds and maximized state; History also returns to full view and opens the history panel. Mode, subject and Manual duration edits remain in full view; a compact Manual start uses the current draft duration.
+Use **Compact mode** in the header to switch this window to a small timer view. This is an explicit toggle; resizing the normal window does not activate it. Compact mode keeps the current subject, mode/session, countdown, primary action, Reset and break balance visible. **Details** expands break controls and a preview of up to three recent sessions (subject, duration and Asia/Jakarta time). Focus target details are omitted; focus and reward calculations are unchanged. Skip break stays visible when applicable. The expand icon at the top restores the previous window bounds and maximized state. **View all** beside History returns to full view and opens Recent sessions. Empty history shows `No sessions yet`. Mode, subject and Manual duration edits remain in full view; a compact Manual start uses the current draft duration.
 
-Compact mode starts at 390x480 logical pixels, or 390x740 with Details open, constrained to the monitor work area. The default collapsed content fits without a scrollbar; smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
+Compact mode starts at 390x480 logical pixels, with Details height fitted to its content and up to three history rows, constrained to the monitor work area. The default collapsed content fits without a scrollbar; smaller available areas allow vertical scrolling. Theme, server rules, sounds and the running timer are shared with full view. Settings and error/retry feedback remain accessible. Every launch starts in full view, and Details starts closed on each entry. Always-on-top is not included.
 
 ## Server sync, disconnection, and recovery
 
@@ -113,6 +113,6 @@ Set `CARGO_TARGET_DIR` to a task-owned OS-temp directory to reuse an isolated pa
 UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.
 
 
-Full view uses a centered timer, one Break balance dropdown (Use all / Choose duration), and a single Settings icon in the header. Focus target cards are omitted from full view; progress and reward rules are unchanged. Compact Details retains its existing controls.
+Full view uses a centered timer, one Break balance dropdown (Use all / Choose duration), and a single Settings icon in the header. Focus target cards are omitted from full view; progress and reward rules are unchanged. Compact Details shows break controls and the recent History preview.
 
 The Break balance menu follows the button width and shows compact Use all / Choose duration options with icons. Opening it does not start a break.

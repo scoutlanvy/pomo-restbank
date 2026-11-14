@@ -1149,7 +1149,7 @@ test("compact fractional DPI uses integer physical pixels and small screens scro
     "aria-expanded",
     "true",
   );
-  await page.locator("#full-view").scrollIntoViewIfNeeded();
+  await page.locator("#compact-history").scrollIntoViewIfNeeded();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -1160,7 +1160,7 @@ test("compact fractional DPI uses integer physical pixels and small screens scro
       () => document.documentElement.scrollHeight > innerHeight,
     ),
   ).toBe(true);
-  await page.locator("#full-view").click();
+  await page.locator("#compact-toggle").click();
   await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
 });
 
@@ -1262,4 +1262,73 @@ test("balance menu matches trigger with compact rows and correct text", async ({
       await expect(page.locator('#balance-toggle')).toHaveCSS('outline-width','2px');
     }
   }
+});
+
+
+test("compact History previews three sessions, fits content, and refreshes only when needed", async ({ page }) => {
+  await mock(page);
+  await enterCompact(page);
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#compact-history-list")).toContainText("Loading your sessions");
+  const sendHistory = async (count: number) => page.evaluate(async (count) => {
+    const sessions = Array.from({ length: count }, (_, i) => ({ subject: i === 0 ? '<Subject> ' + 'Long name '.repeat(20) : `Subject ${i}`, recorded_at: '2026-11-14T00:00:00Z', mode: 'pomodoro', duration_seconds: 1500 }));
+    await (window as any).__TAURI_INTERNALS__.invoke('plugin:event|emit', { event: 'restbank:history', payload: { type: 'history', sessions, summary: [] } });
+  }, count);
+  await sendHistory(0);
+  await expect(page.locator("#compact-history-list")).toHaveText("No sessions yet.");
+  await expect.poll(() => page.evaluate(() => (window as any)._native.size.height)).toBeLessThan(740);
+  const emptyHeight = await page.evaluate(() => (window as any)._native.size.height);
+  await sendHistory(1);
+  await expect(page.locator("#compact-history-list .history-row")).toHaveCount(1);
+  await sendHistory(5);
+  await expect(page.locator("#compact-history-list .history-row")).toHaveCount(3);
+  await expect(page.locator("#compact-history-list .history-row").first()).toContainText('<Subject>');
+  await expect(page.locator("#compact-history-list .history-row").first()).toContainText('07:00');
+  await expect(page.locator("#compact-history-list .history-row").first()).toContainText('25m 00s');
+  await expect(page.locator("#compact-history-list subject")).toHaveCount(0);
+  await expect(page.getByText("Focus target", { exact: true })).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => (window as any)._native.size.height)).toBeGreaterThan(emptyHeight);
+  const height = await page.evaluate(() => (window as any)._native.size.height);
+  await page.setViewportSize({ width: 390, height });
+  await expect.poll(() => page.locator("#compact-details").evaluate(el => innerHeight - el.getBoundingClientRect().bottom)).toBe(16);
+  await page.screenshot({ path: join(tmpdir(), "pomo-restbank-history-preview-light.png"), fullPage: true });
+  await page.evaluate(() => document.querySelector<HTMLButtonElement>("#theme")!.click());
+  await page.screenshot({ path: join(tmpdir(), "pomo-restbank-history-preview-dark.png"), fullPage: true });
+  await page.locator("#compact-history").focus();
+  const requests = await page.evaluate(() => (window as any)._historyRequests);
+  const resizes = await page.evaluate(() => (window as any)._native.calls.filter((c: string) => c === 'set_size').length);
+  await page.evaluate(async () => { const w = window as any; w._view.snapshot.state.tick_sequence++; await w._update({}); });
+  await expect(page.locator("#compact-history")).toBeFocused();
+  expect(await page.evaluate(() => (window as any)._historyRequests)).toBe(requests);
+  expect(await page.evaluate(() => (window as any)._native.calls.filter((c: string) => c === 'set_size').length)).toBe(resizes);
+  await page.evaluate(async () => { const w = window as any; w._view.snapshot.state.revision++; await w._update({}); });
+  await expect.poll(() => page.evaluate(() => (window as any)._historyRequests)).toBe(requests + 1);
+  await page.evaluate(() => (window as any)._update({ connection: 'disconnected' }));
+  await expect(page.locator("#compact-history-list")).toContainText("Reconnect");
+  await page.evaluate(() => (window as any)._update({ connection: 'connected' }));
+  await expect.poll(() => page.evaluate(() => (window as any)._historyRequests)).toBe(requests + 2);
+  await page.evaluate(() => (window as any)._update({ endpoint: 'ws://127.0.0.1:4318/v1/ws' }));
+  await expect.poll(() => page.evaluate(() => (window as any)._historyRequests)).toBe(requests + 3);
+  await expect(page.locator("#compact-history-list")).toContainText("Loading your sessions");
+  await sendHistory(5);
+  await expect(page.locator("#compact-history-list .history-row")).toHaveCount(3);
+  await page.locator("#compact-history").click();
+  await expect(page.locator("html")).toHaveAttribute("data-layout", "full");
+  await expect(page.locator('[data-tab="recent"]')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator("#history-list .history-row")).toHaveCount(5);
+});
+
+
+test("automatic Details fitting preserves a manually resized window width", async ({ page }) => {
+  await mock(page);
+  await enterCompact(page);
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#compact-history-list")).toContainText("Loading");
+  await expect.poll(() => page.evaluate(() => (window as any)._native.size.height)).not.toBe(600);
+  await page.evaluate(() => { (window as any)._native.size.width = 360; });
+  await page.setViewportSize({ width: 360, height: 700 });
+  await page.evaluate(async () => (window as any).__TAURI_INTERNALS__.invoke('plugin:event|emit', { event: 'restbank:history', payload: { type: 'history', sessions: [{ subject: 'Umum', recorded_at: '2026-11-14T00:00:00Z', duration_seconds: 1500, mode: 'pomodoro' }], summary: [] } }));
+  await expect(page.locator("#compact-history-list .history-row")).toHaveCount(1);
+  await expect.poll(() => page.evaluate(() => (window as any)._native.size.width)).toBe(360);
+  await expect.poll(() => page.locator("#compact-toggle").isEnabled()).toBe(true);
 });
