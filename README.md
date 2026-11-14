@@ -116,3 +116,5 @@ UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real We
 Full view uses a centered timer, one Break balance dropdown (Use all / Choose duration), and a single Settings icon in the header. Focus target cards are omitted from full view; progress and reward rules are unchanged. Compact Details shows break controls and the recent History preview.
 
 The Break balance menu follows the button width and shows compact Use all / Choose duration options with icons. Opening it does not start a break.
+
+In full view, the full-width Break balance dropdown sits below the timer and above Pause/Start and Reset. History is separated from the action buttons by extra spacing.

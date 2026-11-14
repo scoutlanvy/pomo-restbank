@@ -89,3 +89,5 @@ Lihat README.md untuk perintah pengujian, PROJECT_OVERVIEW.md untuk rincian tekn
 Tampilan lengkap memakai timer terpusat, satu dropdown Break balance (Use all / Choose duration), dan satu ikon Settings di header. Kartu Focus target tidak ditampilkan di tampilan lengkap; aturan progres dan hadiah tetap sama. Details mode ringkas tetap tersedia.
 
 Menu Break balance mengikuti lebar tombol dan menampilkan pilihan Use all / Choose duration dengan ikon. Membuka menu tidak memulai istirahat.
+
+Pada tampilan penuh, dropdown Break balance selebar area kontrol berada di bawah timer dan di atas Pause/Start serta Reset. History diberi jarak tambahan dari tombol aksi.

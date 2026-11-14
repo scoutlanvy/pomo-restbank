@@ -1103,3 +1103,34 @@ body { min-height: 100dvh; }
 button.layout-lock:disabled { opacity: 1; cursor: pointer; }
 #compact-detail-toggle:active, #compact-history:active,
 :root[data-layout="compact"] #compact-toggle:active { transform: none; }
+
+/* Full workspace follows the compact, timer-first visual composition. */
+:root:not([data-layout="compact"]) #workspace { max-width: 560px; }
+:root:not([data-layout="compact"]) .timer-panel { padding: 20px 24px 0; }
+:root:not([data-layout="compact"]) .mode-tabs { max-width: 320px; margin: 18px auto 14px; }
+:root:not([data-layout="compact"]) .mode-tabs button:disabled:not(.pending-lock) { opacity: .7; }
+:root:not([data-layout="compact"]) .mode-tabs button.selected:disabled { opacity: 1; }
+:root:not([data-layout="compact"]) .subject-picker:disabled:not(.pending-lock) { opacity: .7; }
+:root:not([data-layout="compact"]) .timer-face {
+  width: clamp(200px, calc(100dvh - 450px), 260px);
+  height: clamp(200px, calc(100dvh - 450px), 260px);
+  margin: 14px auto 8px;
+}
+:root:not([data-layout="compact"]) .phase-icon { display: none; }
+:root:not([data-layout="compact"]) .balance-control { margin: 0 auto 18px; max-width: 460px; }
+:root:not([data-layout="compact"]) #balance-toggle {
+  width: 100%; justify-content: flex-start; min-height: 44px;
+  background: var(--field); font-weight: 500;
+}
+:root:not([data-layout="compact"]) #balance-value { margin-left: auto; font-variant-numeric: tabular-nums; }
+:root:not([data-layout="compact"]) #balance-toggle:disabled:not(.pending-lock) { opacity: .7; }
+:root:not([data-layout="compact"]) .timer-actions { max-width: 460px; }
+:root:not([data-layout="compact"]) .panel-bottom { margin-top: 24px; padding: 12px 0; }
+:root:not([data-layout="compact"]) footer { max-width: 560px; }
+:root[data-theme="dark"]:not([data-layout="compact"]) .connection.connected {
+  background: transparent; color: var(--text);
+}
+@media (max-width: 500px) {
+  :root:not([data-layout="compact"]) .timer-panel { padding: 18px 16px 0; }
+  :root:not([data-layout="compact"]) #balance-toggle { gap: 8px; padding: 10px 12px; }
+}
