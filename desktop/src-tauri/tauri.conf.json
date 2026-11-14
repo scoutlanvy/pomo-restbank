@@ -31,6 +31,8 @@
             "core:default",
             "core:window:allow-close",
             "core:window:allow-set-theme",
+            "core:window:allow-set-background-color",
+            "core:webview:allow-set-webview-background-color",
             "core:window:allow-set-size",
             "core:window:allow-set-resizable",
             "core:window:allow-set-maximizable",

@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, "Segoe UI", sans-serif;
   color: #242637;
-  background: #f5f5f8;
+  background: var(--bg);
   font-synthesis: none;
   --bg: #f5f5f8;
   --panel: #fff;
@@ -1089,7 +1089,7 @@ body { min-height: 100dvh; }
 #balance-menu button + button { border-top: 1px solid var(--line); border-radius: 0; }
 #balance-menu #break-choose > svg:last-child { margin-left: auto; transform: rotate(-90deg); width: 16px; }
 
-:root[data-layout="compact"][data-details="true"] main { padding-bottom: 16px; }
+
 :root[data-layout="compact"] .panel-bottom { display: block; }
 .compact-history-heading { display: flex; align-items: center; justify-content: space-between; }
 .compact-history-heading > span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
@@ -1098,3 +1098,8 @@ body { min-height: 100dvh; }
 #compact-history-preview .history-row > div > strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #compact-history-preview .history-row > strong { flex-shrink: 0; }
 #compact-history-list .empty-state { margin: 8px 0 0; padding: 8px 0; font-size: 12px; }
+
+/* Layout locks preserve pointer feedback; keyboard focus remains visible. */
+button.layout-lock:disabled { opacity: 1; cursor: pointer; }
+#compact-detail-toggle:active, #compact-history:active,
+:root[data-layout="compact"] #compact-toggle:active { transform: none; }

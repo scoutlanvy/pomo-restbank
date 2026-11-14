@@ -1,7 +1,7 @@
 import "./style.css";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
-import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { WindowLayout } from "./window-layout";
 
 type Mode = "manual" | "pomodoro";
@@ -124,6 +124,7 @@ let history: History | null = null;
 let historyVisible = false;
 let compact = false;
 let compactDetails = false;
+let stagedCompactDetails: boolean | null = null;
 let layoutChanging = false;
 const windowLayout = new WindowLayout();
 let historyTab = "recent";
@@ -169,6 +170,7 @@ async function changeLayout(
   if (layoutChanging || (nextCompact && !view.snapshot)) return;
   layoutChanging = true;
   const focused = document.activeElement as HTMLElement | null;
+  const previousOverflow = document.documentElement.style.overflowY;
   syncLayoutButtons();
   if (modal.open) modal.close();
   workspace
@@ -181,6 +183,16 @@ async function changeLayout(
     if (compact && nextCompact && details) {
       renderCompactHistory();
       detailsHeight = measureCompactDetails();
+    }
+    if (compact && nextCompact) {
+      // Prepare the final DOM before Windows exposes or removes client pixels.
+      // Clip only a currently fitting viewport, so constrained screens keep scrolling.
+      if (document.documentElement.scrollHeight <= innerHeight)
+        document.documentElement.style.overflowY = "hidden";
+      stagedCompactDetails = details;
+      document.documentElement.dataset.details = String(details);
+      workspace.querySelector<HTMLElement>("#compact-details")!.hidden = !details;
+      workspace.getBoundingClientRect();
     }
     await windowLayout.change(nextCompact, details, detailsHeight);
     compact = nextCompact;
@@ -201,6 +213,11 @@ async function changeLayout(
   } catch (error) {
     showError(`Could not change the window layout: ${String(error)}`);
   } finally {
+    stagedCompactDetails = null;
+    document.documentElement.dataset.details = String(compactDetails);
+    const detailRegion = workspace.querySelector<HTMLElement>("#compact-details");
+    if (detailRegion) detailRegion.hidden = !compact || !compactDetails;
+    document.documentElement.style.overflowY = previousOverflow;
     layoutChanging = false;
     syncLayoutButtons();
     scheduleCompactFit();
@@ -212,6 +229,7 @@ async function changeLayout(
 function syncLayoutButtons() {
   const toggle = document.querySelector<HTMLButtonElement>("#compact-toggle")!;
   toggle.disabled = layoutChanging || !view.snapshot;
+  toggle.classList.toggle("layout-lock", layoutChanging);
   toggle.setAttribute(
     "aria-label",
     compact ? "Return to full view" : "Enter compact mode",
@@ -223,7 +241,9 @@ function syncLayoutButtons() {
       "#compact-detail-toggle, #compact-history",
     )
     .forEach((button) => {
-      button.disabled = layoutChanging;
+      button.disabled = false;
+      button.setAttribute("aria-disabled", String(layoutChanging));
+      button.setAttribute("aria-busy", String(layoutChanging));
     });
 }
 const savedTheme = localStorage.getItem("restbank:theme");
@@ -237,7 +257,11 @@ function applyTheme() {
   const selected = theme;
   // Serialize native updates so rapid toggles keep the final selected theme.
   nativeThemeUpdate = nativeThemeUpdate
-    .then(() => getCurrentWindow().setTheme(selected))
+    .then(async () => {
+      const win = getCurrentWebviewWindow();
+      await win.setTheme(selected);
+      await win.setBackgroundColor(selected === "dark" ? "#14151e" : "#f5f5f8");
+    })
     .catch((error) => console.error("Could not update window theme:", error));
 }
 applyTheme();
@@ -474,6 +498,7 @@ function buildWorkspace() {
     .querySelector("#compact-detail-toggle")!
     .addEventListener("click", () => changeLayout(true, !compactDetails));
   workspace.querySelector("#compact-history")!.addEventListener("click", () => {
+    if (layoutChanging) return;
     historyTab = "recent";
     void changeLayout(false, false, true);
   });
@@ -624,7 +649,7 @@ function render() {
   const menu = workspace.querySelector<HTMLElement>("#balance-menu")!;
   if (!compact && breakActions.parentElement !== menu) menu.append(breakActions);
   if (compact && menu.matches(":popover-open")) menu.hidePopover();
-  detailRegion.hidden = !compact || !compactDetails;
+  detailRegion.hidden = !compact || !(stagedCompactDetails ?? compactDetails);
   const connection =
     workspace.querySelector<HTMLButtonElement>("#connection-status")!;
   connection.className = `connection ${view.connection}`;

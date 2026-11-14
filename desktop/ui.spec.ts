@@ -17,6 +17,7 @@ function nativeIPC(cmd,args){
  const val=args?.value?.toJSON?.();const v=val?.Physical??val?.Logical;
  switch(key){
  case 'set_theme':n.theme=args.value;return;
+ case 'set_background_color':n.background=args.value;return;
  case 'is_resizable':return n.resizable;
  case 'is_maximizable':return n.maximizable;
  case 'set_resizable':n.resizable=args.value;return;
@@ -28,7 +29,7 @@ function nativeIPC(cmd,args){
  case 'scale_factor':return window._monitor.scaleFactor;
  case 'available_monitors':return [window._monitor];
  case 'current_monitor':return window._monitor;
- case 'set_size':n.size={...v};return;
+ case 'set_size':n.resizeLayouts=(n.resizeLayouts??[]);n.resizeLayouts.push({detailsHidden:document.querySelector('#compact-details')?.hidden,overflow:document.documentElement.style.overflowY});n.size={...v};return;
  case 'set_min_size':n.minimum={...v};return;
  case 'set_position':n.position={...v};return;
  case 'maximize':n.restore={size:{...n.size},position:{...n.position}};n.maximized=true;n.position={x:0,y:0};n.size={width:1904,height:1001};return;
@@ -38,7 +39,7 @@ function nativeIPC(cmd,args){
 }
 window._commands=[];window._historyRequests=0;window._retryRequests=0;window._holdCommand=false;
 window._view={snapshot:{state:{revision:1,tick_sequence:0,mode:'pomodoro',subject:'Umum',status:'idle',timer:null,balance_seconds:300,cycle_position:0,shared_progress:0,per_subject_progress:{},settings:{focus_scope:'shared',tick_sound:false,tick_volume:100},subjects:['Umum','English','Programming'],focus_seconds:1500,alarm_id:null},server_time_ms:Date.now(),storage_error:null,preview:false},connection:'connected',endpoint:'ws://127.0.0.1:4317/v1/ws',has_token:true,pending:null,error:null,profile:'test',preview:false,};window._defaultSnapshot=window._view.snapshot;Object.assign(window._view,${JSON.stringify(overrides)});
-_mockIPC((cmd,args)=>{if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='save_application_preferences'){window._application=args;return null;}if(cmd==='quit_application'){window._quitRequests=(window._quitRequests??0)+1;return null;}if(cmd==='initialize_local'){window._imports=(window._imports??[]);window._imports.push(args);if(window._importError)throw new Error(window._importError);return window._update({initializing:false,import_available:false,snapshot:window._defaultSnapshot,connection:'connected'});}if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
+_mockIPC((cmd,args)=>{if(cmd==='plugin:webview|set_webview_background_color'){window._native.webviewBackground=args.value;return;}if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='save_application_preferences'){window._application=args;return null;}if(cmd==='quit_application'){window._quitRequests=(window._quitRequests??0)+1;return null;}if(cmd==='initialize_local'){window._imports=(window._imports??[]);window._imports.push(args);if(window._importError)throw new Error(window._importError);return window._update({initializing:false,import_available:false,snapshot:window._defaultSnapshot,connection:'connected'});}if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
 window._update=async (partial)=>{window._view={...window._view,...partial};await window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'restbank:view',payload:window._view});};
 `;
     await route.fulfill({ response, body: bootstrap + original });
@@ -1384,4 +1385,40 @@ test("compact locks manual resizing and maximize, Details still fits, and Full v
   await expect(page.locator('#banner')).toContainText('Simulated window failure');
   await expect(page.locator('html')).toHaveAttribute('data-layout', 'full');
   expect(await page.evaluate(() => [(window as any)._native.resizable, (window as any)._native.maximizable])).toEqual([true, true]);
+});
+
+
+test("Details prepares content before native resize and retains pointer/keyboard focus without flashing", async ({ page }) => {
+  await mock(page);
+  await expect.poll(() => page.evaluate(() => (window as any)._native.webviewBackground)).toBe('#f5f5f8');
+  await page.getByRole('button', { name: 'Toggle color theme' }).click();
+  await expect.poll(() => page.evaluate(() => (window as any)._native.background)).toBe('#14151e');
+  await expect.poll(() => page.evaluate(() => (window as any)._native.webviewBackground)).toBe('#14151e');
+  await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(20, 21, 30)');
+  await enterCompact(page);
+  await page.evaluate(() => { (window as any)._native.resizeLayouts = []; });
+  await page.locator('#compact-detail-toggle').click();
+  await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#compact-toggle')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any)._native.resizeLayouts)).toEqual([{ detailsHidden: false, overflow: 'hidden' }]);
+  await expect(page.locator('#compact-detail-toggle')).toBeFocused();
+  expect(await page.locator('#compact-detail-toggle').evaluate(el => el.matches(':focus-visible'))).toBe(false);
+  await expect(page.locator('#compact-detail-toggle')).toHaveCSS('opacity', '1');
+  await page.evaluate(() => { (window as any)._native.resizeLayouts = []; });
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('#compact-toggle')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any)._native.resizeLayouts[0].detailsHidden)).toBe(true);
+  await expect(page.locator('#compact-detail-toggle')).toBeFocused();
+  expect(await page.locator('#compact-detail-toggle').evaluate(el => el.matches(':focus-visible'))).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.style.overflowY)).toBe('');
+  await page.locator('#compact-detail-toggle').click();
+  await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#compact-toggle')).toBeEnabled();
+  await page.evaluate(() => { (window as any)._native.fail = 'set_size'; });
+  await page.locator('#compact-detail-toggle').click();
+  await expect(page.locator('#banner')).toContainText('Simulated window failure');
+  await expect(page.locator('#compact-details')).toBeVisible();
+  await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'true');
+  expect(await page.evaluate(() => document.documentElement.style.overflowY)).toBe('');
 });
