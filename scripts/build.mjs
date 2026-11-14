@@ -4,9 +4,12 @@ import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { releaseVersion } from './release-version.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const { tag, version } = releaseVersion(root);
+console.log(`Release version: ${version} (Git tag ${tag})`);
 const output = resolve(process.argv[2] ?? join(root, 'dist'));
-const target = process.env.CARGO_TARGET_DIR ?? await mkdtemp(join(tmpdir(), 'pomo-restbank-release-'));
+const target = process.env.CARGO_TARGET_DIR ? resolve(process.env.CARGO_TARGET_DIR) : await mkdtemp(join(tmpdir(), 'pomo-restbank-release-'));
 const env = { ...process.env, CARGO_TARGET_DIR: target };
 const npmCli = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
 function run(program, args, cwd = root) {
@@ -46,14 +49,19 @@ async function zip(names, destination) {
 }
 run('npm', ['--prefix', 'desktop', 'run', 'build']);
 run('cargo', ['build', '--release', '-p', 'pomo-restbank-server', '--bins']);
-run('npm', ['run', 'tauri', '--', 'build'], join(root, 'desktop'));
+// Tauri merges this overlay without changing tracked development manifests.
+const versionConfig = join(target, 'restbank-release-version.json');
+await mkdir(target, { recursive: true });
+await writeFile(versionConfig, JSON.stringify({ version }));
+run('npm', ['run', 'tauri', '--', 'build', '--config', resolve(versionConfig)], join(root, 'desktop'));
 await mkdir(output, { recursive: true });
 const executables = ['pomo-restbank.exe', 'pomo-restbank-server.exe', 'PomoRestbank-Launcher.exe'];
 for (const name of executables) await copy(join(target, 'release', name), name);
-const installers = (await readdir(join(target, 'release', 'bundle', 'nsis'))).filter(name => name.endsWith('-setup.exe'));
+const installers = (await readdir(join(target, 'release', 'bundle', 'nsis'))).filter(name => name === `Pomo Restbank_${version}_x64-setup.exe`);
+if (installers.length !== 1) throw new Error(`Expected NSIS installer for release ${version}; refusing to package a stale installer.`);
 for (const name of installers) await copy(join(target, 'release', 'bundle', 'nsis', name), name);
 for (const [source, name] of [['README.id.md', 'PETUNJUK.md'], ['LICENSE', 'LICENSE'], ['VALIDATION.md', 'VALIDATION.md']]) await copy(join(root, source), name);
-const archive = 'Pomo-Restbank-0.1.0-windows-x64.zip';
+const archive = `Pomo-Restbank-${version}-windows-x64.zip`;
 await zip([...executables, 'PETUNJUK.md', 'LICENSE', 'VALIDATION.md'], join(output, archive));
 const checksums = [];
 for (const name of [...executables, ...installers, archive]) checksums.push(`${hash(await readFile(join(output, name)))}  ${name}`);
