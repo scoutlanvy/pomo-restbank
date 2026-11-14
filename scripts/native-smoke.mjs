@@ -256,6 +256,9 @@ try {
   await closeClient(normal);
   await layout(a.page, "#compact-toggle", "compact", false);
   const compactBounds = await geometry(a.page);
+  assert.equal(await a.page.evaluate(() => window.__TAURI_INTERNALS__.invoke("plugin:window|is_resizable", { label: "main" })), false);
+  assert.equal(await a.page.evaluate(() => window.__TAURI_INTERNALS__.invoke("plugin:window|is_maximizable", { label: "main" })), false);
+  report.checks.push("native compact disables manual resizing and maximize");
   report.compact = { originalBounds, compactBounds };
   assert.ok(
     Math.abs(compactBounds.size.width / compactBounds.scale - 390) <= 2,
@@ -304,6 +307,9 @@ try {
   );
   await layout(a.page, "#compact-toggle", "full");
   const restoredBounds = await geometry(a.page);
+  assert.equal(await a.page.evaluate(() => window.__TAURI_INTERNALS__.invoke("plugin:window|is_resizable", { label: "main" })), true);
+  assert.equal(await a.page.evaluate(() => window.__TAURI_INTERNALS__.invoke("plugin:window|is_maximizable", { label: "main" })), true);
+  report.checks.push("native full view restores resizing and maximize after Details");
   report.compact.restoredBounds = restoredBounds;
   const area = restoredBounds.monitor.workArea;
   const availableWidth =

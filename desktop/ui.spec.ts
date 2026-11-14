@@ -10,13 +10,17 @@ async function mock(page: Page, overrides: Record<string, unknown> = {}) {
 import { mockIPC as _mockIPC, mockWindows as _mockWindows } from '/node_modules/@tauri-apps/api/mocks.js';
 _mockWindows('main');
 window._monitor={name:'Test',scaleFactor:1,position:{x:0,y:0},size:{width:1920,height:1080},workArea:{position:{x:0,y:0},size:{width:1920,height:1040}}};
-window._native={maximized:false,position:{x:200,y:100},size:{width:680,height:850},minimum:{width:390,height:560},calls:[],fail:null};
+window._native={resizable:true,maximizable:true,maximized:false,position:{x:200,y:100},size:{width:680,height:850},minimum:{width:390,height:560},calls:[],fail:null};
 function nativeIPC(cmd,args){
  const n=window._native;const key=cmd.split('|')[1];n.calls.push(key);
  if(n.fail===key){n.fail=null;throw new Error('Simulated window failure');}
  const val=args?.value?.toJSON?.();const v=val?.Physical??val?.Logical;
  switch(key){
  case 'set_theme':n.theme=args.value;return;
+ case 'is_resizable':return n.resizable;
+ case 'is_maximizable':return n.maximizable;
+ case 'set_resizable':n.resizable=args.value;return;
+ case 'set_maximizable':n.maximizable=args.value;return;
  case 'is_maximized':return n.maximized;
  case 'inner_size':return {...n.size};
  case 'outer_size':return {width:n.size.width+16,height:n.size.height+39};
@@ -1360,4 +1364,24 @@ test("Details opens and closes with one native resize and no redundant window mo
     }
   }
   expect(await page.evaluate(() => (window as any)._commands)).toEqual([]);
+});
+
+
+test("compact locks manual resizing and maximize, Details still fits, and Full view restores flags", async ({ page }) => {
+  await mock(page);
+  await enterCompact(page);
+  expect(await page.evaluate(() => [(window as any)._native.resizable, (window as any)._native.maximizable])).toEqual([false, false]);
+  await page.locator('#compact-detail-toggle').click();
+  await expect(page.locator('#compact-detail-toggle')).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#compact-toggle')).toBeEnabled();
+  expect(await page.evaluate(() => (window as any)._native.size.height)).toBeGreaterThan(480);
+  expect(await page.evaluate(() => [(window as any)._native.resizable, (window as any)._native.maximizable])).toEqual([false, false]);
+  await page.locator('#compact-toggle').click();
+  await expect(page.locator('html')).toHaveAttribute('data-layout', 'full');
+  expect(await page.evaluate(() => [(window as any)._native.resizable, (window as any)._native.maximizable])).toEqual([true, true]);
+  await page.evaluate(() => { (window as any)._native.fail = 'set_maximizable'; });
+  await page.locator('#compact-toggle').click();
+  await expect(page.locator('#banner')).toContainText('Simulated window failure');
+  await expect(page.locator('html')).toHaveAttribute('data-layout', 'full');
+  expect(await page.evaluate(() => [(window as any)._native.resizable, (window as any)._native.maximizable])).toEqual([true, true]);
 });

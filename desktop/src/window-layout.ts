@@ -11,6 +11,8 @@ type Bounds = {
   position: PhysicalPosition;
   size: PhysicalSize;
   maximized: boolean;
+  resizable: boolean;
+  maximizable: boolean;
 };
 
 // One native window; timer state and connections do not participate in resizing.
@@ -22,6 +24,8 @@ export class WindowLayout {
     const win = getCurrentWindow();
     const before: Bounds = {
       maximized: await win.isMaximized(),
+      resizable: await win.isResizable(),
+      maximizable: await win.isMaximizable(),
       position: await win.outerPosition(),
       size: await win.innerSize(),
     };
@@ -31,6 +35,7 @@ export class WindowLayout {
         await win.unmaximize();
         // Capture Windows' restored rectangle, not the maximized client size.
         rollback = {
+          ...before,
           maximized: true,
           position: await win.outerPosition(),
           size: await win.innerSize(),
@@ -39,6 +44,10 @@ export class WindowLayout {
       const target = !compact ? this.full : null;
       if (!compact && !target)
         throw new Error("Full window bounds are unavailable.");
+      if (compact !== this.compact) {
+        await win.setResizable(compact ? false : target!.resizable);
+        await win.setMaximizable(compact ? false : target!.maximizable);
+      }
       const monitors = await availableMonitors();
       const position = target?.position ?? rollback.position;
       const monitor =
@@ -88,6 +97,8 @@ export class WindowLayout {
     } catch (error) {
       // Best effort rollback also restores Windows' normal rectangle before maximize.
       try {
+        await win.setResizable(rollback.resizable);
+        await win.setMaximizable(rollback.maximizable);
         await win.setMinSize(new PhysicalSize(1, 1));
         await win.setSize(rollback.size);
         await win.setPosition(rollback.position);
