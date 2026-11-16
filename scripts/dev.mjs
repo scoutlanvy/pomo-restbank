@@ -22,7 +22,8 @@ console.log(`Development data: ${join(directory, 'data')}`);
 console.log(`Development build cache: ${env.CARGO_TARGET_DIR}`);
 const result = spawnSync(process.execPath, [
   join(root, 'desktop/node_modules/@tauri-apps/cli/tauri.js'),
-  'dev', '--', '--', '--backend', 'local', '--data-dir', join(directory, 'data'),
+  'dev', '--config', join(root, 'desktop/src-tauri/tauri.dev.conf.json'),
+  '--', '--', '--backend', 'local', '--data-dir', join(directory, 'data'),
 ], { cwd: join(root, 'desktop'), env, stdio: 'inherit' });
 if (result.error) throw result.error;
 process.exitCode = result.status ?? 1;

@@ -1,0 +1,7 @@
+{
+  "productName": "Pomo Restbank DEV",
+  "identifier": "com.pomorestbank.desktop.dev",
+  "bundle": {
+    "icon": ["icons/dev.ico"]
+  }
+}
