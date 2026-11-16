@@ -20,6 +20,33 @@ export class WindowLayout {
   private full: Bounds | null = null;
   private compact = false;
 
+  // Windows may apply DPI scaling to a default size larger than its work area.
+  async fitStartup(): Promise<void> {
+    const win = getCurrentWindow();
+    if (await win.isMaximized()) return;
+    const monitor = await currentMonitor();
+    if (!monitor) return;
+    const inner = await win.innerSize();
+    const outer = await win.outerSize();
+    const position = await win.outerPosition();
+    const area = monitor.workArea;
+    const width = Math.max(1, area.size.width - (outer.width - inner.width));
+    const height = Math.max(1, area.size.height - (outer.height - inner.height));
+    const size = new PhysicalSize(Math.min(inner.width, width), Math.min(inner.height, height));
+    if (size.width !== inner.width || size.height !== inner.height) {
+      await win.setMinSize(new PhysicalSize(
+        Math.min(Math.round(390 * monitor.scaleFactor), size.width),
+        Math.min(Math.round(560 * monitor.scaleFactor), size.height),
+      ));
+      await win.setSize(size);
+    }
+    const next = new PhysicalPosition(
+      Math.max(area.position.x, Math.min(position.x, area.position.x + width - size.width)),
+      Math.max(area.position.y, Math.min(position.y, area.position.y + height - size.height)),
+    );
+    if (next.x !== position.x || next.y !== position.y) await win.setPosition(next);
+  }
+
   async change(compact: boolean, details: boolean, detailsHeight?: number): Promise<void> {
     const win = getCurrentWindow();
     const before: Bounds = {

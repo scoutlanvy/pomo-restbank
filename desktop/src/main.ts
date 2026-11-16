@@ -1303,6 +1303,8 @@ function applyView(next: View) {
     document.querySelector("#dialog-error")!.textContent = view.error;
 }
 async function boot() {
+  try { await windowLayout.fitStartup(); }
+  catch (error) { console.error("Could not fit startup window to monitor work area", error); }
   await listen<View>("restbank:view", (event) => applyView(event.payload));
   await listen<History>("restbank:history", (event) => {
     history = event.payload;

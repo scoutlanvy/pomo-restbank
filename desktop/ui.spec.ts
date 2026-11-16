@@ -1429,7 +1429,9 @@ test("History toggles preserve horizontal layout with and without existing overf
   await page.setViewportSize({ width: 680, height: 1200 });
   const footer = await page.locator("footer").boundingBox();
   expect(footer).not.toBeNull();
-  expect(Math.abs(footer!.y + footer!.height - 1200)).toBeLessThanOrEqual(1);
+  const panel = await page.locator(".timer-panel").boundingBox();
+  expect(panel).not.toBeNull();
+  expect(footer!.y - (panel!.y + panel!.height)).toBeLessThan(24);
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1200);
   const geometry = () => page.evaluate(() =>
     [".topbar", ".timer-panel", "#countdown"].map((selector) => {
@@ -1452,4 +1454,23 @@ test("History toggles preserve horizontal layout with and without existing overf
       expect(await geometry()).toEqual(before);
     }
   }
+});
+
+test('startup bounds include window frame and exclude the taskbar at high DPI', async ({ page }) => {
+  await mock(page);
+  await expect(page.locator('#countdown')).toBeVisible();
+  const bounds = await page.evaluate(async () => {
+    const w = window as any;
+    w._monitor.scaleFactor = 2;
+    w._monitor.workArea = { position: { x: -1920, y: 0 }, size: { width: 1920, height: 1040 } };
+    w._native.position = { x: -1800, y: 120 };
+    w._native.size = { width: 1360, height: 1700 };
+    const path = '/src/window-layout.ts';
+    const { WindowLayout } = await import(path);
+    await new WindowLayout().fitStartup();
+    return w._native;
+  });
+  expect(bounds.size).toEqual({ width: 1360, height: 1001 });
+  expect(bounds.position).toEqual({ x: -1800, y: 0 });
+  expect(bounds.minimum).toEqual({ width: 780, height: 1001 });
 });
