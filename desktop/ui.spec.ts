@@ -1426,6 +1426,11 @@ test("Details prepares content before native resize and retains pointer/keyboard
 
 test("History toggles preserve horizontal layout with and without existing overflow", async ({ page }) => {
   await mock(page);
+  await page.setViewportSize({ width: 680, height: 1200 });
+  const footer = await page.locator("footer").boundingBox();
+  expect(footer).not.toBeNull();
+  expect(Math.abs(footer!.y + footer!.height - 1200)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(1200);
   const geometry = () => page.evaluate(() =>
     [".topbar", ".timer-panel", "#countdown"].map((selector) => {
       const rect = document.querySelector(selector)!.getBoundingClientRect();

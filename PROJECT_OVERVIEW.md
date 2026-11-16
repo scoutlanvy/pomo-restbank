@@ -103,3 +103,5 @@ Release packaging resolves exactly one `vMAJOR.MINOR.PATCH` tag on HEAD before c
 Tauri beforeDevCommand and the Playwright web server use `dev:frontend` to start Vite without recursively launching desktop development. Frontend build and release commands retain their existing meanings.
 
 The dev wrapper passes `desktop/src-tauri/tauri.dev.conf.json` as a CLI configuration overlay. It overrides productName, identifier, and bundle.icon with `icons/dev.ico` (a purple variant of the existing clock with a yellow DEV badge). Tauri embeds this default icon for the native window, taskbar, tray, and debug executable. The normal configuration and release packaging retain the original icon and identifier.
+
+Full view uses a viewport-height flex column on #app, with a bottom-aligned footer and normal-flow header/main. Spare window height appears above the footer rather than below it. Long History content expands the document normally; compact layout is excluded.
