@@ -123,6 +123,8 @@ In full view, the full-width Break balance dropdown sits below the timer and abo
 
 ## Desktop development
 
+See [DEVELOPMENT.md](DEVELOPMENT.md) (Indonesian) for prerequisites, isolated development, the source map, testing, and release workflow.
+
 After installing the build prerequisites, run from the repository root:
 
 ```powershell

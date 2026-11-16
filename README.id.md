@@ -96,6 +96,8 @@ Pada tampilan penuh, dropdown Break balance selebar area kontrol berada di bawah
 
 ## Development desktop
 
+Lihat [DEVELOPMENT.md](DEVELOPMENT.md) untuk prasyarat, development terisolasi, struktur kode, pengujian, dan alur rilis.
+
 Setelah memasang prasyarat build, jalankan dari root repository:
 
 ```powershell
