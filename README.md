@@ -120,3 +120,18 @@ Full view uses a centered timer, one Break balance dropdown (Use all / Choose du
 The Break balance menu follows the button width and shows compact Use all / Choose duration options with icons. Opening it does not start a break.
 
 In full view, the full-width Break balance dropdown sits below the timer and above Pause/Start and Reset. History is separated from the action buttons by extra spacing.
+
+## Desktop development
+
+After installing the build prerequisites, run from the repository root:
+
+```powershell
+npm.cmd --prefix desktop ci
+npm.cmd --prefix desktop run dev
+```
+
+This opens the Tauri application titled **Pomo Restbank [DEV]**, with frontend hot reload and Rust rebuilds. Local mode is forced for startup. Data, settings, WebView storage, and import discovery use a repository-specific directory under the system Temp directory, separate from the main application. Data persists between dev runs until Temp is cleared; it is disposable development data. The command prints its data and build-cache locations and sets an isolated `CARGO_TARGET_DIR` automatically. The main application can remain running. Quit the dev application and use Ctrl+C to stop the development command.
+
+`npm.cmd --prefix desktop run dev:frontend` starts only Vite; the regular browser cannot run the native timer backend. Direct `run tauri -- dev` bypasses the isolation wrapper. `run build` checks TypeScript and builds only the frontend; `run release` creates the distributable application and requires a version tag on HEAD.
+
+The dev command also applies a dedicated Tauri configuration with a purple clock icon and yellow DEV badge, plus a separate application identifier. The taskbar, title bar, and tray use the dev icon; release builds keep the original icon. Restart the dev command after changing this configuration.

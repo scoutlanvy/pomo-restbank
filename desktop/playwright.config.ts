@@ -12,7 +12,7 @@ export default defineConfig({
     viewport: { width: 680, height: 850 },
   },
   webServer: {
-    command: "npm run dev",
+    command: "npm run dev:frontend",
     url: "http://127.0.0.1:1420",
     reuseExistingServer: false,
   },

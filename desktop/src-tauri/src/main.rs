@@ -625,7 +625,7 @@ fn run() -> anyhow::Result<()> {
         })), tx, config: config_tx, pool, directory: preferences_directory.clone(), preferences_directory, local, quitting: Arc::new(AtomicBool::new(false)) };
         app.manage(client.clone());
         tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?.data_directory(dir.join("webview"))
-            .title(if preview { "Pomo Restbank — TEST MODE" } else { "Pomo Restbank" }).build()?;
+            .title(if cfg!(debug_assertions) && std::env::var("POMO_RESTBANK_DEV").as_deref() == Ok("1") { "Pomo Restbank [DEV]" } else if preview { "Pomo Restbank — TEST MODE" } else { "Pomo Restbank" }).build()?;
         let tray_result = create_tray(app.handle());
         tauri::async_runtime::block_on(async {
             let mut inner = client.inner.lock().await;

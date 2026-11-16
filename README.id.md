@@ -93,3 +93,18 @@ Tampilan lengkap memakai timer terpusat, satu dropdown Break balance (Use all / 
 Menu Break balance mengikuti lebar tombol dan menampilkan pilihan Use all / Choose duration dengan ikon. Membuka menu tidak memulai istirahat.
 
 Pada tampilan penuh, dropdown Break balance selebar area kontrol berada di bawah timer dan di atas Pause/Start serta Reset. History diberi jarak tambahan dari tombol aksi.
+
+## Development desktop
+
+Setelah memasang prasyarat build, jalankan dari root repository:
+
+```powershell
+npm.cmd --prefix desktop ci
+npm.cmd --prefix desktop run dev
+```
+
+Perintah ini membuka aplikasi Tauri berjudul **Pomo Restbank [DEV]**, dengan hot reload frontend dan kompilasi ulang Rust. Startup dipaksa memakai mode Lokal. Data, pengaturan, penyimpanan WebView, dan pencarian sumber impor memakai direktori khusus repository di Temp sistem, terpisah dari aplikasi utama. Data tetap tersedia antar-run sampai Temp dibersihkan; data ini hanya untuk development dan boleh hilang. Perintah menampilkan lokasi data serta cache build dan mengatur `CARGO_TARGET_DIR` terisolasi secara otomatis. Aplikasi utama boleh tetap berjalan. Gunakan Quit pada aplikasi dev dan Ctrl+C untuk menghentikan perintah development.
+
+`npm.cmd --prefix desktop run dev:frontend` hanya menjalankan Vite; browser biasa tidak dapat menjalankan backend timer native. Pemanggilan langsung `run tauri -- dev` melewati wrapper isolasi. `run build` memeriksa TypeScript dan hanya membangun frontend; `run release` membuat distribusi aplikasi dan memerlukan tag versi pada HEAD.
+
+Perintah dev juga memakai konfigurasi Tauri khusus dengan ikon jam ungu dan label DEV kuning, serta identifier aplikasi terpisah. Taskbar, title bar, dan tray memakai ikon dev; build rilis tetap memakai ikon asli. Jalankan ulang perintah dev setelah mengubah konfigurasi ini.
