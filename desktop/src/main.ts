@@ -1252,11 +1252,11 @@ document.addEventListener("keydown", (e) => {
   e.preventDefault();
   if (spaceHeld || e.repeat) return;
   spaceHeld = true;
-  if (
-    usable() &&
-    ["running", "paused", "alarm"].includes(view.snapshot?.state.status ?? "")
-  )
-    primary();
+  const state = view.snapshot?.state;
+  const canActivate =
+    ["running", "paused", "alarm"].includes(state?.status ?? "") ||
+    (state?.status === "idle" && state.mode === "pomodoro");
+  if (usable() && canActivate) primary();
 });
 document.addEventListener("keyup", (e) => {
   if (e.code === "Space") spaceHeld = false;

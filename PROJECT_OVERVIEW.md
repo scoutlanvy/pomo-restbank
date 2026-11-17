@@ -38,7 +38,7 @@ Each profile owns a SQLite snapshot cache, connection.json, file lock, and isola
 
 ## UI and audio
 
-Space invokes the primary action for Running, Paused, and Alarm states (Pause, Resume, and Stop Alarm). Held/repeated presses issue at most one command until release; inputs, interactive controls, and open dialogs retain their normal keyboard behavior. Idle and Choice do not start timers through this shortcut. Existing connection, pending, and storage guards apply in both layouts.
+Space invokes Start Focus in Idle Pomodoro mode and the primary action for Running, Paused, and Alarm states (Pause, Resume, and Stop Alarm). Held/repeated presses issue at most one command until release; inputs, interactive controls, and open dialogs retain their normal keyboard behavior. Idle Manual and Choice do not start timers through this shortcut. Existing connection, pending, and storage guards apply in both layouts. Enter retains normal control behavior.
 
 The frontend applies the saved light/dark theme (or the initial system preference) to both the document and the native Tauri window at startup and on theme toggles. Native setTheme calls are serialized and use the narrowly scoped core:window:allow-set-theme capability so the Windows title bar follows the UI. Native failures are logged without interrupting timer controls.
 

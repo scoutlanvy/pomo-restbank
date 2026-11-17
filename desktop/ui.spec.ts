@@ -115,15 +115,17 @@ test("disconnected client disables commands while keeping connection settings av
     page.getByRole("button", { name: "Save preferences" }),
   ).toBeDisabled();
 });
-test("space pauses a running timer once but never starts an idle timer", async ({
+test("space pauses a running timer once but never starts an idle Manual timer", async ({
   page,
 }) => {
   await mock(page);
+  await updateState(page, { mode: "manual" });
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("Space");
   expect(await page.evaluate(() => (window as any)._commands.length)).toBe(0);
   await page.evaluate(() => {
     const w = window as any;
+    w._view.snapshot.state.mode = "pomodoro";
     w._view.snapshot.state.status = "running";
     w._view.snapshot.state.timer = {
       phase: "focus",
@@ -142,6 +144,23 @@ test("space pauses a running timer once but never starts an idle timer", async (
   ]);
 });
 for (const compact of [false, true]) {
+  test(`space starts Focus once in ${compact ? "compact" : "full"} view`, async ({ page }) => {
+    await mock(page);
+    if (compact) await page.locator("#compact-toggle").click();
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.press("Enter");
+    expect(await page.evaluate(() => (window as any)._commands)).toHaveLength(0);
+    await page.keyboard.down("Space");
+    await page.keyboard.down("Space");
+    await expect
+      .poll(() => page.evaluate(() => (window as any)._commands))
+      .toEqual([{ type: "start", seconds: 0 }]);
+    await updateState(page, { status: "running", timer: focusTimer() });
+    await page.keyboard.down("Space");
+    await page.keyboard.up("Space");
+    expect(await page.evaluate(() => (window as any)._commands)).toHaveLength(1);
+  });
+
   test(`space stops an alarm once in ${compact ? "compact" : "full"} view`, async ({ page }) => {
     await mock(page);
     if (compact) await page.locator("#compact-toggle").click();
