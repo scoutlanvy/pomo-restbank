@@ -141,6 +141,31 @@ test("space pauses a running timer once but never starts an idle timer", async (
     { type: "pause" },
   ]);
 });
+for (const compact of [false, true]) {
+  test(`space stops an alarm once in ${compact ? "compact" : "full"} view`, async ({ page }) => {
+    await mock(page);
+    if (compact) await page.locator("#compact-toggle").click();
+    await updateState(page, {
+      status: "alarm",
+      timer: focusTimer(),
+      alarm_id: "test-alarm",
+    });
+    await page.locator("body").click({ position: { x: 5, y: 5 } });
+    await page.keyboard.down("Space");
+    await page.keyboard.down("Space");
+    await expect
+      .poll(() => page.evaluate(() => (window as any)._commands))
+      .toEqual([{ type: "stop_alarm" }]);
+    await updateState(page, { status: "choice", timer: null, alarm_id: null });
+    await page.keyboard.down("Space");
+    await page.keyboard.up("Space");
+    await page.keyboard.press("Space");
+    expect(await page.evaluate(() => (window as any)._commands)).toEqual([
+      { type: "stop_alarm" },
+    ]);
+  });
+}
+
 test("settings save sends shared preferences and does not save Cancel changes", async ({
   page,
 }) => {

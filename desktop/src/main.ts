@@ -1254,7 +1254,7 @@ document.addEventListener("keydown", (e) => {
   spaceHeld = true;
   if (
     usable() &&
-    ["running", "paused"].includes(view.snapshot?.state.status ?? "")
+    ["running", "paused", "alarm"].includes(view.snapshot?.state.status ?? "")
   )
     primary();
 });
