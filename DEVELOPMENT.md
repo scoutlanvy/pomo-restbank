@@ -24,3 +24,10 @@ Berhenti: **Quit** di tray/Settings, lalu Ctrl+C di terminal. Tombol X secara de
 
 Pemanggilan langsung `run tauri -- dev` melewati isolasi dan dapat memakai data utama.
 e-smoke.mjs --build-dir PATH_TO_BUILD_OUTPUT.
+
+Jika port 1420 sedang dipakai, tes UI dapat memakai port lain tanpa menghentikan aplikasi development:
+
+```powershell
+$env:POMO_UI_TEST_PORT = '1432'
+npm.cmd --prefix desktop test
+```

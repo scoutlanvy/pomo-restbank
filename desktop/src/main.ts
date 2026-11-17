@@ -8,6 +8,7 @@ type Mode = "manual" | "pomodoro";
 type Status = "idle" | "running" | "paused" | "choice" | "alarm";
 type Scope = "shared" | "per_subject";
 type Timer = {
+  counts_toward_pomodoro?: boolean;
   phase: "manual" | "focus" | "break";
   total_seconds: number;
   remaining_seconds: number;
@@ -26,7 +27,12 @@ type State = {
   cycle_position: number;
   shared_progress: number;
   per_subject_progress: Record<string, number>;
-  settings: { focus_scope: Scope; tick_sound: boolean; tick_volume: number };
+  settings: {
+    manual_counts_toward_pomodoro?: boolean;
+    focus_scope: Scope;
+    tick_sound: boolean;
+    tick_volume: number;
+  };
   subjects: string[];
   focus_seconds: number;
   alarm_id: string | null;
@@ -475,7 +481,7 @@ function syncDialogControls() {
 function buildWorkspace() {
   renderedSubjects = "";
   renderedHistory = undefined;
-  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div class="balance-control"><button id="balance-toggle" class="secondary" popovertarget="balance-menu" aria-expanded="false" aria-controls="balance-menu">${icon("cup")}Break balance <strong id="balance-value"></strong>${icon("chevron")}</button><div id="balance-menu" popover="auto" aria-label="Break options"><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">${icon("clock")}<span>Choose duration\u2026</span>${icon("chevron")}</button></div></div></div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="panel-bottom"><section id="compact-history-preview" class="compact-only" aria-label="Recent history"><div class="compact-history-heading"><span>${icon("history")}History</span><button id="compact-history" class="text-button">View all</button></div><div id="compact-history-list" aria-live="polite"></div></section><button id="history-toggle" class="text-button"></button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
+  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div id="manual-contribution"><label class="check-row"><input id="manual-counts" type="checkbox" role="switch">Count toward Pomodoro</label><p class="hint">Completed time and time saved by Reset count toward your focus target.</p></div><div class="balance-control"><button id="balance-toggle" class="secondary" popovertarget="balance-menu" aria-expanded="false" aria-controls="balance-menu">${icon("cup")}Break balance <strong id="balance-value"></strong>${icon("chevron")}</button><div id="balance-menu" popover="auto" aria-label="Break options"><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">${icon("clock")}<span>Choose duration\u2026</span>${icon("chevron")}</button></div></div></div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="panel-bottom"><section id="compact-history-preview" class="compact-only" aria-label="Recent history"><div class="compact-history-heading"><span>${icon("history")}History</span><button id="compact-history" class="text-button">View all</button></div><div id="compact-history-list" aria-live="polite"></div></section><button id="history-toggle" class="text-button"></button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
   workspace
     .querySelector("#connection-status")!
     .addEventListener("click", () => openSettings(true));
@@ -518,6 +524,19 @@ function buildWorkspace() {
   });
   setupSubjects();
   setupDuration();
+  const contribution = workspace.querySelector<HTMLInputElement>("#manual-counts")!;
+  contribution.addEventListener("change", () => {
+    const s = view.snapshot!.state;
+    const input = workspace.querySelector<HTMLInputElement>("#manual-counts")!;
+    const selected = input.checked;
+    input.checked = !!s.settings.manual_counts_toward_pomodoro;
+    if (!usable() || s.status !== "idle" || s.mode !== "manual") return;
+    void command({
+      type: "save_settings",
+      ...s.settings,
+      manual_counts_toward_pomodoro: selected,
+    });
+  });
   workspace.querySelector("#primary")!.addEventListener("click", primary);
   workspace.querySelector("#reset")!.addEventListener("click", () => {
     manual = [0, 0, 0];
@@ -636,6 +655,16 @@ function render() {
   workspace.querySelector("#compact-detail-toggle")!
     .setAttribute("aria-expanded", String(compactDetails));
   const detailRegion = workspace.querySelector<HTMLElement>("#compact-details")!;
+  let contributionStatus = detailRegion.querySelector<HTMLElement>("#manual-contribution-status");
+  if (!contributionStatus) {
+    contributionStatus = document.createElement("p");
+    contributionStatus.id = "manual-contribution-status";
+    contributionStatus.className = "hint";
+    detailRegion.prepend(contributionStatus);
+  }
+  contributionStatus.hidden = s.mode !== "manual";
+  const counts = s.timer?.counts_toward_pomodoro ?? s.settings.manual_counts_toward_pomodoro;
+  setText(contributionStatus, `Count toward Pomodoro: ${counts ? "On" : "Off"}`);
   // Reuse the existing break controls and their handlers in both layouts.
   const actions = workspace.querySelector<HTMLElement>(".break-actions")!;
   const bottom = workspace.querySelector<HTMLElement>(".panel-bottom")!;
@@ -706,6 +735,10 @@ function render() {
   workspace
     .querySelectorAll<HTMLInputElement>(".duration-fields input")
     .forEach((input) => lockCommandControl(input, !available() || !idle));
+  workspace.querySelector<HTMLElement>("#manual-contribution")!.hidden = s.mode !== "manual";
+  const contribution = workspace.querySelector<HTMLInputElement>("#manual-counts")!;
+  contribution.checked = !!counts;
+  lockCommandControl(contribution, !available() || !idle);
   const primaryButton = workspace.querySelector<HTMLButtonElement>("#primary")!;
   setMarkup(
     primaryButton,

@@ -34,12 +34,16 @@ pub enum Scope {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(default)]
+    pub manual_counts_toward_pomodoro: bool,
     pub focus_scope: Scope,
     pub tick_sound: bool,
     pub tick_volume: u16,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Timer {
+    #[serde(default)]
+    pub counts_toward_pomodoro: bool,
     pub session_id: Uuid,
     pub phase: Phase,
     pub total_seconds: u32,
@@ -95,6 +99,8 @@ pub enum Command {
     SkipBreak,
     StopAlarm,
     SaveSettings {
+        #[serde(default)]
+        manual_counts_toward_pomodoro: Option<bool>,
         focus_scope: Scope,
         tick_sound: bool,
         tick_volume: u16,
@@ -166,6 +172,7 @@ impl State {
             shared_progress: 0,
             per_subject_progress: BTreeMap::new(),
             settings: Settings {
+                manual_counts_toward_pomodoro: false,
                 focus_scope: Scope::Shared,
                 tick_sound: false,
                 tick_volume: 100,
@@ -223,6 +230,8 @@ impl State {
     }
     fn new_timer(&self, phase: Phase, seconds: u32, return_to_choice: bool) -> Timer {
         Timer {
+            counts_toward_pomodoro: phase == Phase::Manual
+                && self.settings.manual_counts_toward_pomodoro,
             session_id: Uuid::new_v4(),
             phase,
             total_seconds: seconds,
@@ -245,6 +254,13 @@ impl State {
             self.short_break
         });
         self.cycle_position = (self.cycle_position + 1) % 4;
+    }
+    fn credit_manual(&mut self, subject: &str, seconds: u32) {
+        let total = self.progress(subject) + seconds;
+        for _ in 0..total / self.focus_seconds {
+            self.award(subject);
+        }
+        self.set_progress(subject, total % self.focus_seconds);
     }
     fn session(timer: &Timer, seconds: u32, now: &str) -> Session {
         Session {
@@ -354,6 +370,17 @@ impl State {
                         self.set_progress(&focus.subject, self.progress(&focus.subject) + elapsed);
                     }
                 }
+                if let Some(timer) = self.timer.clone()
+                    && timer.phase == Phase::Manual
+                    && timer.counts_toward_pomodoro
+                    && timer.remaining_seconds > 0
+                {
+                    let elapsed = timer.total_seconds - timer.remaining_seconds;
+                    if elapsed > 0 {
+                        sessions.push(Self::session(&timer, elapsed, now));
+                        self.credit_manual(&timer.subject, elapsed);
+                    }
+                }
                 self.timer = None;
                 self.status = Status::Idle;
                 self.alarm_id = None;
@@ -399,6 +426,7 @@ impl State {
                 self.acknowledge_alarm();
             }
             Command::SaveSettings {
+                manual_counts_toward_pomodoro,
                 focus_scope,
                 tick_sound,
                 tick_volume,
@@ -408,6 +436,8 @@ impl State {
                     return Err("Tick volume must be 0–400%.".into());
                 }
                 self.settings = Settings {
+                    manual_counts_toward_pomodoro: manual_counts_toward_pomodoro
+                        .unwrap_or(self.settings.manual_counts_toward_pomodoro),
                     focus_scope: *focus_scope,
                     tick_sound: *tick_sound,
                     tick_volume: *tick_volume,
@@ -470,6 +500,8 @@ impl State {
             sessions.push(Self::session(&timer, timer.total_seconds, now));
             if timer.phase == Phase::Focus {
                 self.award(&timer.subject);
+            } else if timer.counts_toward_pomodoro {
+                self.credit_manual(&timer.subject, timer.total_seconds);
             }
         }
         self.status = Status::Alarm;

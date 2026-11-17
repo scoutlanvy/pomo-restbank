@@ -247,3 +247,56 @@ async fn preview_database_cannot_be_opened_as_normal() {
             .is_err()
     );
 }
+
+#[tokio::test]
+async fn manual_completion_rolls_back_contribution_and_reward_then_retries_once() {
+    let (dir, s) = setup().await;
+    execute(
+        &s,
+        Command::Select {
+            mode: restbank_domain::Mode::Manual,
+            subject: "Umum".into(),
+        },
+    )
+    .await;
+    execute(
+        &s,
+        Command::SaveSettings {
+            focus_scope: restbank_domain::Scope::Shared,
+            tick_sound: false,
+            tick_volume: 100,
+            manual_counts_toward_pomodoro: Some(true),
+        },
+    )
+    .await;
+    execute(&s, Command::Start { seconds: 10 }).await;
+    for _ in 0..9 {
+        s.tick().await;
+    }
+    let pool = sqlx::SqlitePool::connect_with(
+        sqlx::sqlite::SqliteConnectOptions::new().filename(dir.path().join("test.sqlite3")),
+    )
+    .await
+    .unwrap();
+    sqlx::query("CREATE TRIGGER fail_write BEFORE INSERT ON study_sessions BEGIN SELECT RAISE(ABORT, 'test failure'); END").execute(&pool).await.unwrap();
+    s.tick().await;
+    let failed = s.snapshot().await;
+    assert_eq!(failed.state.status, Status::Paused);
+    assert_eq!(failed.state.timer.unwrap().remaining_seconds, 1);
+    assert_eq!(failed.state.balance_seconds, 0);
+    assert!(failed.storage_error.is_some());
+    assert!(
+        matches!(s.history().await.unwrap(),ServerMessage::History{sessions,..}if sessions.is_empty())
+    );
+    sqlx::query("DROP TRIGGER fail_write")
+        .execute(&pool)
+        .await
+        .unwrap();
+    execute(&s, Command::RetryStorage).await;
+    execute(&s, Command::Resume).await;
+    s.tick().await;
+    assert_eq!(s.snapshot().await.state.balance_seconds, 5);
+    assert!(
+        matches!(s.history().await.unwrap(),ServerMessage::History{sessions,..}if sessions.len()==1)
+    );
+}

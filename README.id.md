@@ -46,7 +46,7 @@ Menjalankan klien Server langsung juga bisa dengan `pomo-restbank.exe --backend 
 ## Alur penggunaan
 
 - Pilih subject dan mode Manual atau Pomodoro. Start tidak otomatis berjalan saat aplikasi dibuka.
-- Manual menyimpan sesi hanya ketika selesai. Reset membatalkan sesi Manual yang belum selesai.
+- Manual menyimpan sesi hanya ketika selesai. Reset membatalkan sesi Manual yang belum selesai jika Count toward Pomodoro OFF.
 - Pomodoro menargetkan fokus 25 menit. Selesai satu target memberikan saldo istirahat 5, 5, 5, lalu 15 menit secara berulang.
 - Stop Alarm membuka pilihan Continue Focus atau memakai saldo; istirahat tidak dimulai otomatis.
 - Reset fokus menyimpan durasi yang sudah dijalani dan mengurangi sisa target berikutnya. Contoh: fokus 10 menit, Reset, lalu target tersisa 15 menit. Selesai sisanya memberikan satu reward, tanpa pencatatan ganda.
@@ -110,3 +110,12 @@ Perintah ini membuka aplikasi Tauri berjudul **Pomo Restbank [DEV]**, dengan hot
 `npm.cmd --prefix desktop run dev:frontend` hanya menjalankan Vite; browser biasa tidak dapat menjalankan backend timer native. Pemanggilan langsung `run tauri -- dev` melewati wrapper isolasi. `run build` memeriksa TypeScript dan hanya membangun frontend; `run release` membuat distribusi aplikasi dan memerlukan tag versi pada HEAD.
 
 Perintah dev juga memakai konfigurasi Tauri khusus dengan ikon jam ungu dan label DEV kuning, serta identifier aplikasi terpisah. Taskbar, title bar, dan tray memakai ikon dev; build rilis tetap memakai ikon asli. Jalankan ulang perintah dev setelah mengubah konfigurasi ini.
+
+
+## Manual ikut progres Pomodoro
+
+Sakelar **Count toward Pomodoro** di bawah input durasi Manual awalnya OFF dan mengingat pilihan terakhir di backend aktif. Pada Server, pilihan tersinkron ke klien lain. Ubah saat Manual Idle; pilihan dikunci ketika sesi dimulai. Details mode ringkas menampilkan status pilihan.
+
+Jika ON, sesi selesai menyumbang seluruh durasi; Reset mencatat dan menyumbang waktu yang sudah dijalani. Setiap target fokus yang tercapai memberikan hadiah sesuai siklus biasa. Kelebihan waktu diteruskan ke target berikutnya, termasuk beberapa target dalam satu sesi panjang. Kontribusi mengikuti Shared / Per subject. Contoh: progres 23 menit + Manual 5 menit memberikan satu hadiah dan menyisakan progres 3 menit. Riwayat tetap mencatat satu sesi Manual.
+
+Jika OFF, Reset membatalkan Manual yang belum selesai seperti sebelumnya. Progres dan hadiah disimpan bersamaan saat selesai atau Reset; pause dan waktu aplikasi mati tidak dihitung. Riwayat lama tidak dihitung ulang; timer lama yang tersimpan memakai OFF.

@@ -1518,3 +1518,23 @@ test('startup bounds include window frame and exclude the taskbar at high DPI', 
   expect(bounds.position).toEqual({ x: -1800, y: 0 });
   expect(bounds.minimum).toEqual({ width: 780, height: 1001 });
 });
+
+
+test("Manual contribution switch defaults off, submits preference, and follows authoritative state", async ({ page }) => {
+  await mock(page);
+  await updateState(page, { mode: "manual" });
+  const toggle = page.getByRole("switch", { name: "Count toward Pomodoro" });
+  await expect(toggle).not.toBeChecked();
+  await toggle.click();
+  await expect.poll(() => page.evaluate(() => (window as any)._commands.at(-1))).toMatchObject({
+    type: "save_settings", manual_counts_toward_pomodoro: true,
+  });
+  await updateState(page, { settings: { focus_scope: "shared", tick_sound: false, tick_volume: 100, manual_counts_toward_pomodoro: true } });
+  await expect(toggle).toBeChecked();
+  await updateState(page, { status: "running", timer: { phase: "manual", total_seconds: 300, remaining_seconds: 200, counts_toward_pomodoro: true } });
+  await expect(toggle).toBeDisabled();
+  await page.locator("#compact-toggle").click();
+  await expect(toggle).not.toBeVisible();
+  await page.locator("#compact-detail-toggle").click();
+  await expect(page.locator("#manual-contribution-status")).toHaveText("Count toward Pomodoro: On");
+});

@@ -149,3 +149,12 @@ On feat/centered-timer-ui, popup width now matches its trigger, rows are 40px hi
 Frontend build, all 42 UI tests, all 30 Rust tests, rustfmt and all-target Clippy passed. UI geometry/text/keyboard tests cover both themes at widths 390 and 680. All 13 native smoke scenarios passed at 200% scaling with added assertions for matching menu width, compact height and correct separator. Evidence: OS-temp pomo-restbank-native-xFm27W and pomo-dropdown-refined.png. Test data was isolated and removed by smoke teardown. WebView2 class-unregistration diagnostics did not fail checks.
 
 The existing dist/centered-timer-ui/pomo-restbank.exe was running and left untouched. The tested executable is delivered as sibling pomo-restbank-dropdown.exe. No installer, merge or push. Build cache and reports remain; 0 bytes cleaned. Normal user and legacy databases were not opened by tests.
+
+
+## Manual contribution switch - 17 November 2026
+
+Count toward Pomodoro defaults OFF, persists in backend preferences, and is captured per Manual timer. Completion and partial Reset credit focus progress; completed targets earn cyclic rewards and preserve excess time.
+
+TypeScript/Vite build, all workspace Rust tests, rustfmt check, Clippy with warnings denied, and whitespace checks passed. All 53 previous Edge UI tests passed; the new switch/compact test passed separately after fixing its Compact button locator. Port 1420 was occupied and left untouched; tests used POMO_UI_TEST_PORT=1432/1433.
+
+Both updated native smoke suites passed with isolated temporary data. Local checks cover the real switch, completion, no duplicate Reset credit, and persistence after restart. Server checks cover preference and progress synchronization between two real clients. Local screenshot was visually inspected. Evidence: OS-temp pomo-local-native-MiY2N2; reports also reside beside debug executables under pomo-restbank-space-alarm-20261117-target/debug. Test databases were removed by smoke teardown; reports/build cache remain. WebView2 teardown diagnostics did not fail checks. No installer/release packaging or replacement of installed applications was performed.

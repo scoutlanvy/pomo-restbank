@@ -10,7 +10,7 @@ Source is independent of the Python repository. Its MIT license, alarm.wav, tick
 
 State has Idle, Running, Paused, Choice, and Alarm statuses, with Manual, Focus, or Break timer phases. Each segment has a UUID, original and remaining seconds, subject, return-to-choice flag, and optional suspended Focus timer. The domain returns history records; it performs no I/O and receives time strings from its caller.
 
-Focus target: 1500 seconds (preview 10). Rewards: 300/300/300/900 (preview 5/5/5/15), cyclic. Reset records only new elapsed focus, including a focus suspended during a break. Prior partial segments stay counted exactly once. Completion clears the selected scope's progress and awards once. Manual completion records its full original duration; Manual Reset discards unfinished progress. Pause, offline time, and break time do not add focus progress. Break debits occur only on committed running seconds. Scope changes preserve independent shared/per-subject accumulations.
+Focus target: 1500 seconds (preview 10). Rewards: 300/300/300/900 (preview 5/5/5/15), cyclic. Reset records only new elapsed focus, including a focus suspended during a break. Prior partial segments stay counted exactly once. Completion clears the selected scope's progress and awards once. Manual completion records its full original duration; Manual Reset discards unfinished progress when Count toward Pomodoro is off. Pause, offline time, and break time do not add focus progress. Break debits occur only on committed running seconds. Scope changes preserve independent shared/per-subject accumulations.
 
 Stop Alarm moves completed focus to Choice, completed Manual to Idle, and completed breaks to their proper destination. A suspended focus always returns Paused. Skip Break returns a non-suspended break to Choice, even if the break started idle. Settings and subject changes require Idle. Deleting a subject preserves stored history and per-subject progress; Umum cannot be deleted.
 
@@ -107,3 +107,12 @@ Tauri beforeDevCommand and the Playwright web server use `dev:frontend` to start
 The dev wrapper passes `desktop/src-tauri/tauri.dev.conf.json` as a CLI configuration overlay. It overrides productName, identifier, and bundle.icon with `icons/dev.ico` (a purple variant of the existing clock with a yellow DEV badge). Tauri embeds this default icon for the native window, taskbar, tray, and debug executable. The normal configuration and release packaging retain the original icon and identifier.
 
 The full-view footer follows the timer/History content with normal spacing rather than being pushed to the viewport bottom. Startup window bounds are clamped to the current monitor work area, accounting for physical window frame dimensions and DPI, so an oversized initial window cannot extend under the taskbar. Already fitting and maximized windows retain their size; compact transitions keep their existing geometry rules. Long content remains scrollable.
+
+
+## Manual contribution to Pomodoro
+
+Manual has a **Count toward Pomodoro** switch below the duration inputs. It starts OFF and remembers the last saved choice in the active backend (shared across Server clients). Change it while Manual is Idle; the choice is captured when starting the timer. Compact Details shows the current choice.
+
+When ON, completion credits the full Manual duration, and Reset records and credits elapsed running time. Every completed focus target earns the normal cyclic reward; excess time carries to the next target, including multiple targets in a long session. Contributions follow Shared / Per subject scope. For example, 23 minutes of progress plus a completed 5-minute Manual session earns one reward and leaves 3 minutes toward the next target. History records the Manual session once. When OFF, unfinished Manual sessions are discarded on Reset as before.
+
+Credits and rewards are committed atomically on completion or Reset, never during the countdown. Pause/offline time does not count. Existing history is not recalculated; old saved timers default to OFF. The optional save_settings field manual_counts_toward_pomodoro preserves the current preference when omitted; settings and timers deserialize missing booleans as false. No database schema migration is required.

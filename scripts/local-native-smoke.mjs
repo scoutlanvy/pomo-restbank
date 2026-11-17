@@ -147,8 +147,29 @@ try {
     assert.equal(normalView.backend, 'local');
     assert.equal(normalView.snapshot.state.focus_seconds, 1500);
     assert.equal(normalView.snapshot.state.balance_seconds, 0);
+    await command(page, { type: 'select', mode: 'manual', subject: 'Umum' });
+    const toggle = page.getByRole('switch', { name: 'Count toward Pomodoro' });
+    assert.equal(await toggle.isChecked(), false);
+    await toggle.click();
+    await until(async () => (await state(page)).snapshot.state.settings.manual_counts_toward_pomodoro, 'saved Manual contribution');
+    await page.screenshot({ path: join(root, 'manual-contribution.png') });
+    await command(page, { type: 'start', seconds: 2 });
+    await until(async () => (await state(page)).snapshot.state.status === 'alarm', 'Manual completion');
+    assert.equal((await state(page)).snapshot.state.shared_progress, 2);
+    await command(page, { type: 'reset' });
+    assert.equal((await state(page)).snapshot.state.shared_progress, 2);
     await quitApp({ page, child: normal });
     report.checks.push('Fresh normal Local startup needs no server; normal/preview databases stay isolated');
+    const reopened = launch('pomo-restbank.exe', ['--data-dir', fresh], { WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${debug}` });
+    await until(async () => (await fetch(`http://127.0.0.1:${debug}/json/version`)).ok, 'reopen normal CDP');
+    const reopenedBrowser = await chromium.connectOverCDP(`http://127.0.0.1:${debug}`);
+    browsers.push(reopenedBrowser);
+    const reopenedPage = await until(() => reopenedBrowser.contexts()[0]?.pages()[0], 'reopened page');
+    await reopenedPage.waitForSelector('#manual-counts');
+    assert.equal(await reopenedPage.locator('#manual-counts').isChecked(), true);
+    assert.equal((await state(reopenedPage)).snapshot.state.shared_progress, 2);
+    await quitApp({ page: reopenedPage, child: reopened });
+    report.checks.push('Manual switch defaults OFF, saves through native UI, credits once, and persists preference/progress after restart');
     report.ok = true;
 }
 catch (error) {

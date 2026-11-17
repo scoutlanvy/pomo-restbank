@@ -441,6 +441,17 @@ try {
     mode: "manual",
     subject: "Algebra",
   });
+  await a.page.getByRole("switch", { name: "Count toward Pomodoro" }).click();
+  await until(async () => (await view(b.page)).snapshot.state.settings.manual_counts_toward_pomodoro, "Manual preference sync");
+  await idleCommand(a.page, { type: "start", seconds: 2 });
+  await status(b.page, "alarm");
+  assert.equal((await view(b.page)).snapshot.state.per_subject_progress.Algebra, 2);
+  await idleCommand(a.page, { type: "reset" });
+  assert.equal((await view(a.page)).snapshot.state.per_subject_progress.Algebra, 2);
+  // Restore the original test's non-contributing Manual session.
+  const preferences = (await view(a.page)).snapshot.state.settings;
+  await idleCommand(a.page, { type: "save_settings", ...preferences, manual_counts_toward_pomodoro: false });
+  report.checks.push("Manual preference and contribution synchronize across two native Server clients without duplicate credit");
   await idleCommand(a.page, { type: "start", seconds: 60 });
   await status(b.page, "running");
   await closeClient(a);

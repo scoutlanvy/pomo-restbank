@@ -65,7 +65,7 @@ To stop a server launched by the helper, identify its process by executable path
 
 ## Timer behavior
 
-- **Manual:** choose 00:00:01–99:59:59, Start, Pause, Resume, or Reset. Only a completed timer records its original duration. Reset discards unfinished Manual progress.
+- **Manual:** choose 00:00:01–99:59:59, Start, Pause, Resume, or Reset. With Count toward Pomodoro OFF, only a completed timer records its original duration, and Reset discards unfinished Manual progress.
 - **Pomodoro:** 25-minute targets earn 5, 5, 5, then 15 minutes of break credit, repeating. Focus completion saves history and rewards atomically before sounding the alarm. Stop Alarm opens explicit Continue Focus / break choices; no next phase starts automatically.
 - **Reset focus:** elapsed focus is saved once under its subject and carried toward the next target. Completing the remaining target earns one reward. Reset after a completion never repeats its record or reward.
 - **Breaks:** use the balance or choose a shorter duration. Only running break seconds cost balance. Skip preserves unused credit. A break taken during paused focus restores that same focus paused after acknowledgement or Skip. An idle break normally returns to idle.
@@ -137,3 +137,12 @@ This opens the Tauri application titled **Pomo Restbank [DEV]**, with frontend h
 `npm.cmd --prefix desktop run dev:frontend` starts only Vite; the regular browser cannot run the native timer backend. Direct `run tauri -- dev` bypasses the isolation wrapper. `run build` checks TypeScript and builds only the frontend; `run release` creates the distributable application and requires a version tag on HEAD.
 
 The dev command also applies a dedicated Tauri configuration with a purple clock icon and yellow DEV badge, plus a separate application identifier. The taskbar, title bar, and tray use the dev icon; release builds keep the original icon. Restart the dev command after changing this configuration.
+
+
+## Manual contribution to Pomodoro
+
+Manual has a **Count toward Pomodoro** switch below the duration inputs. It starts OFF and remembers the last saved choice in the active backend (shared across Server clients). Change it while Manual is Idle; the choice is captured when starting the timer. Compact Details shows the current choice.
+
+When ON, completion credits the full Manual duration, and Reset records and credits elapsed running time. Every completed focus target earns the normal cyclic reward; excess time carries to the next target, including multiple targets in a long session. Contributions follow Shared / Per subject scope. For example, 23 minutes of progress plus a completed 5-minute Manual session earns one reward and leaves 3 minutes toward the next target. History records the Manual session once. When OFF, unfinished Manual sessions are discarded on Reset as before.
+
+Credits and rewards are committed atomically on completion or Reset, never during the countdown. Pause/offline time does not count. Existing history is not recalculated; old saved timers default to OFF. The optional save_settings field manual_counts_toward_pomodoro preserves the current preference when omitted; settings and timers deserialize missing booleans as false. No database schema migration is required.

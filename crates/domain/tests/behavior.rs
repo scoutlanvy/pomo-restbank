@@ -158,6 +158,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     apply(
         &mut s,
         Command::SaveSettings {
+            manual_counts_toward_pomodoro: None,
             focus_scope: Scope::PerSubject,
             tick_sound: true,
             tick_volume: 400,
@@ -169,6 +170,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     assert!(
         s.apply(
             &Command::SaveSettings {
+                manual_counts_toward_pomodoro: None,
                 focus_scope: Scope::Shared,
                 tick_sound: false,
                 tick_volume: 0
@@ -190,6 +192,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     apply(
         &mut s,
         Command::SaveSettings {
+            manual_counts_toward_pomodoro: None,
             focus_scope: Scope::Shared,
             tick_sound: false,
             tick_volume: 0,
@@ -288,4 +291,81 @@ fn paused_focus_target_includes_carried_and_current_segment() {
     s.balance_seconds = 20;
     apply(&mut s, Command::StartBreak { seconds: 20 });
     assert_eq!(s.target_progress(), 390);
+}
+
+#[test]
+fn manual_contribution_reset_completion_and_overflow() {
+    let mut s = State::new(false);
+    s.mode = Mode::Manual;
+    s.settings.manual_counts_toward_pomodoro = true;
+    apply(&mut s, Command::Start { seconds: 300 });
+    assert!(apply(&mut s, Command::Reset).is_empty());
+    apply(&mut s, Command::Start { seconds: 300 });
+    run(&mut s, 120);
+    let records = apply(&mut s, Command::Reset);
+    assert_eq!(records[0].duration_seconds, 120);
+    assert_eq!(records[0].mode, Mode::Manual);
+    assert_eq!(s.shared_progress, 120);
+    s.shared_progress = 1380;
+    apply(&mut s, Command::Start { seconds: 300 });
+    let records = run(&mut s, 300);
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0].duration_seconds, 300);
+    assert_eq!(s.shared_progress, 180);
+    assert_eq!(s.balance_seconds, 300);
+    assert!(apply(&mut s, Command::Reset).is_empty());
+    assert_eq!(s.balance_seconds, 300);
+    s.mode = Mode::Pomodoro;
+    apply(&mut s, Command::Start { seconds: 0 });
+    assert_eq!(s.timer.as_ref().unwrap().remaining_seconds, 1320);
+}
+
+#[test]
+fn manual_multiple_targets_scope_and_recovery() {
+    let mut s = State::new(true);
+    s.mode = Mode::Manual;
+    s.settings.focus_scope = Scope::PerSubject;
+    s.settings.manual_counts_toward_pomodoro = true;
+    apply(&mut s, Command::Start { seconds: 43 });
+    run(&mut s, 12);
+    s = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+    s.recover();
+    assert!(run(&mut s, 100).is_empty());
+    apply(&mut s, Command::Resume);
+    assert_eq!(run(&mut s, 31).len(), 1);
+    assert_eq!(s.progress("Umum"), 3);
+    assert_eq!(s.progress("English"), 0);
+    assert_eq!(s.shared_progress, 0);
+    assert_eq!(s.balance_seconds, 30);
+    assert_eq!(s.cycle_position, 0);
+    s.validate().unwrap();
+}
+
+#[test]
+fn old_manual_data_defaults_off_and_legacy_settings_preserve_choice() {
+    let mut s = State::new(false);
+    s.mode = Mode::Manual;
+    apply(&mut s, Command::Start { seconds: 300 });
+    let mut json = serde_json::to_value(&s).unwrap();
+    json["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("manual_counts_toward_pomodoro");
+    json["timer"]
+        .as_object_mut()
+        .unwrap()
+        .remove("counts_toward_pomodoro");
+    s = serde_json::from_value(json).unwrap();
+    assert!(!s.settings.manual_counts_toward_pomodoro);
+    assert!(!s.timer.as_ref().unwrap().counts_toward_pomodoro);
+    s.settings.manual_counts_toward_pomodoro = true;
+    run(&mut s, 120);
+    assert!(apply(&mut s, Command::Reset).is_empty());
+    assert_eq!(s.shared_progress, 0);
+    let command = serde_json::from_str(
+        r#"{"type":"save_settings","focus_scope":"shared","tick_sound":false,"tick_volume":100}"#,
+    )
+    .unwrap();
+    apply(&mut s, command);
+    assert!(s.settings.manual_counts_toward_pomodoro);
 }
