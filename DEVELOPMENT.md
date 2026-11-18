@@ -31,3 +31,6 @@ Jika port 1420 sedang dipakai, tes UI dapat memakai port lain tanpa menghentikan
 $env:POMO_UI_TEST_PORT = '1432'
 npm.cmd --prefix desktop test
 ```
+
+
+Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau dari commit aktif, dengan akhiran `-dev` (contoh `0.3.0-dev`). Tanpa tag, versi konfigurasi menjadi dasar. Mulai ulang perintah dev setelah membuat tag baru. Release tetap memakai tepat satu tag pada HEAD tanpa akhiran dev; konfigurasi terlacak tidak diubah.

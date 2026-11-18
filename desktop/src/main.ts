@@ -1,4 +1,5 @@
 import "./style.css";
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
@@ -1056,14 +1057,23 @@ function openLocalSetup() {
   });
   document.querySelector("#import-local")!.addEventListener("click", () => initialize(true));
 }
+const applicationVersion = getVersion().catch((error) => {
+  console.error("Unable to read application version", error);
+  return null;
+});
+
 function openSettings(connectionOnly = false) {
   settingsSaveRevision = null;
   const s = view.snapshot?.state;
   const editable = canEditSettings();
   openDialog(
     "Make it your space",
-    `${applicationSettingsMarkup()}<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">${view.backend === "local" ? "Saved on this laptop." : "Shared with your other connected clients."}</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section" ${view.backend === "local" ? "hidden" : ""}><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div>`,
+    `${applicationSettingsMarkup()}<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">${view.backend === "local" ? "Saved on this laptop." : "Shared with your other connected clients."}</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section" ${view.backend === "local" ? "hidden" : ""}><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div><section class="settings-section" aria-label="About"><h3>About</h3><p>Pomo Restbank</p><p id="application-version" class="muted">Version: Loading...</p></section>`,
   );
+  const versionLabel = modal.querySelector<HTMLElement>("#application-version")!;
+  void applicationVersion.then((version) => {
+    versionLabel.textContent = version ? `Version ${version}` : "Version unavailable";
+  });
   document
     .querySelector("#cancel-preferences")!
     .addEventListener("click", () => modal.close());

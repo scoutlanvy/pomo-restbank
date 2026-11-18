@@ -119,3 +119,6 @@ Sakelar **Count toward Pomodoro** di bawah input durasi Manual awalnya OFF dan m
 Jika ON, sesi selesai menyumbang seluruh durasi; Reset mencatat dan menyumbang waktu yang sudah dijalani. Setiap target fokus yang tercapai memberikan hadiah sesuai siklus biasa. Kelebihan waktu diteruskan ke target berikutnya, termasuk beberapa target dalam satu sesi panjang. Kontribusi mengikuti Shared / Per subject. Contoh: progres 23 menit + Manual 5 menit memberikan satu hadiah dan menyisakan progres 3 menit. Riwayat tetap mencatat satu sesi Manual.
 
 Jika OFF, Reset membatalkan Manual yang belum selesai seperti sebelumnya. Progres dan hadiah disimpan bersamaan saat selesai atau Reset; pause dan waktu aplikasi mati tidak dihitung. Riwayat lama tidak dihitung ulang; timer lama yang tersimpan memakai OFF.
+
+
+Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau dari commit aktif, dengan akhiran `-dev` (contoh `0.3.0-dev`). Tanpa tag, versi konfigurasi menjadi dasar. Mulai ulang perintah dev setelah membuat tag baru. Release tetap memakai tepat satu tag pada HEAD tanpa akhiran dev; konfigurasi terlacak tidak diubah.

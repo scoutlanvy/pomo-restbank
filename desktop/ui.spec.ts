@@ -39,7 +39,7 @@ function nativeIPC(cmd,args){
 }
 window._commands=[];window._historyRequests=0;window._retryRequests=0;window._holdCommand=false;
 window._view={snapshot:{state:{revision:1,tick_sequence:0,mode:'pomodoro',subject:'Umum',status:'idle',timer:null,balance_seconds:300,cycle_position:0,shared_progress:0,per_subject_progress:{},settings:{focus_scope:'shared',tick_sound:false,tick_volume:100},subjects:['Umum','English','Programming'],focus_seconds:1500,alarm_id:null},server_time_ms:Date.now(),storage_error:null,preview:false},connection:'connected',endpoint:'ws://127.0.0.1:4317/v1/ws',has_token:true,pending:null,error:null,profile:'test',preview:false,};window._defaultSnapshot=window._view.snapshot;Object.assign(window._view,${JSON.stringify(overrides)});
-_mockIPC((cmd,args)=>{if(cmd==='plugin:webview|set_webview_background_color'){window._native.webviewBackground=args.value;return;}if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='save_application_preferences'){window._application=args;return null;}if(cmd==='quit_application'){window._quitRequests=(window._quitRequests??0)+1;return null;}if(cmd==='initialize_local'){window._imports=(window._imports??[]);window._imports.push(args);if(window._importError)throw new Error(window._importError);return window._update({initializing:false,import_available:false,snapshot:window._defaultSnapshot,connection:'connected'});}if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
+_mockIPC((cmd,args)=>{if(cmd==='plugin:app|version')return '0.3.0';if(cmd==='plugin:webview|set_webview_background_color'){window._native.webviewBackground=args.value;return;}if(cmd.startsWith('plugin:window|'))return nativeIPC(cmd,args);if(cmd==='get_view')return window._view;if(cmd==='save_application_preferences'){window._application=args;return null;}if(cmd==='quit_application'){window._quitRequests=(window._quitRequests??0)+1;return null;}if(cmd==='initialize_local'){window._imports=(window._imports??[]);window._imports.push(args);if(window._importError)throw new Error(window._importError);return window._update({initializing:false,import_available:false,snapshot:window._defaultSnapshot,connection:'connected'});}if(cmd==='send_command'){window._commands.push(args.command);if(window._holdCommand)return new Promise((resolve,reject)=>{window._finishCommand=(error)=>error?reject(error):resolve(null);});return null;}if(cmd==='connect_server'){window._connection=args;return null;}if(cmd==='retry_pending'){window._retryRequests++;return null;}if(cmd==='request_history'){window._historyRequests++;return null;}},{shouldMockEvents:true});
 window._update=async (partial)=>{window._view={...window._view,...partial};await window.__TAURI_INTERNALS__.invoke('plugin:event|emit',{event:'restbank:view',payload:window._view});};
 `;
     await route.fulfill({ response, body: bootstrap + original });
@@ -1537,4 +1537,14 @@ test("Manual contribution switch defaults off, submits preference, and follows a
   await expect(toggle).not.toBeVisible();
   await page.locator("#compact-detail-toggle").click();
   await expect(page.locator("#manual-contribution-status")).toHaveText("Count toward Pomodoro: On");
+});
+
+
+test("Settings About shows the runtime application version", async ({ page }) => {
+  await mock(page);
+  await page.locator("#settings").click();
+  const about = page.getByRole("region", { name: "About", exact: true });
+  await expect(about).toContainText("Pomo Restbank");
+  await expect(about).toContainText("Version 0.3.0");
+  await expect(about).not.toContainText("License");
 });
