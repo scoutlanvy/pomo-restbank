@@ -122,3 +122,6 @@ Jika OFF, Reset membatalkan Manual yang belum selesai seperti sebelumnya. Progre
 
 
 Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau dari commit aktif, dengan akhiran `-dev` (contoh `0.3.0-dev`). Tanpa tag, versi konfigurasi menjadi dasar. Mulai ulang perintah dev setelah membuat tag baru. Release tetap memakai tepat satu tag pada HEAD tanpa akhiran dev; konfigurasi terlacak tidak diubah.
+
+
+Settings > Timer preferences > **Alarm sound duration** menyediakan 30 seconds (default), 1 minute, dan Until stopped. Berlaku untuk Manual, fokus Pomodoro, dan istirahat. Hanya suara yang berhenti otomatis; status selesai tetap menunggu Stop Alarm dan sesi berikutnya tidak berjalan otomatis. Pilihan disimpan di backend dan tersinkron antar-klien Server. Data lama memakai default 30 detik. Penghentian suara tidak bergantung pada pembaruan UI; jadwal dibatalkan saat Stop Alarm, Reset, koneksi terputus, atau aplikasi keluar.

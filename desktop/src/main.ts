@@ -29,6 +29,7 @@ type State = {
   shared_progress: number;
   per_subject_progress: Record<string, number>;
   settings: {
+    alarm_sound_seconds?: number;
     manual_counts_toward_pomodoro?: boolean;
     focus_scope: Scope;
     tick_sound: boolean;
@@ -1068,7 +1069,7 @@ function openSettings(connectionOnly = false) {
   const editable = canEditSettings();
   openDialog(
     "Make it your space",
-    `${applicationSettingsMarkup()}<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">${view.backend === "local" ? "Saved on this laptop." : "Shared with your other connected clients."}</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section" ${view.backend === "local" ? "hidden" : ""}><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div><section class="settings-section" aria-label="About"><h3>About</h3><p>Pomo Restbank</p><p id="application-version" class="muted">Version: Loading...</p></section>`,
+    `${applicationSettingsMarkup()}<div class="settings-section"><h3>Timer preferences</h3><div class="preferences-status"><p id="preferences-description" class="muted">${view.backend === "local" ? "Saved on this laptop." : "Shared with your other connected clients."}</p>${pendingFeedbackMarkup("retry-settings-pending")}</div><p id="preferences-hint" class="hint" ${editable ? "hidden" : ""}>Connect and finish or Reset the timer to edit preferences.</p><form id="preferences"><fieldset ${editable ? "" : "disabled"}><label>Focus progress<select id="scope"><option value="shared" ${s?.settings.focus_scope !== "per_subject" ? "selected" : ""}>Shared across subjects</option><option value="per_subject" ${s?.settings.focus_scope === "per_subject" ? "selected" : ""}>Per subject</option></select></label><label>Alarm sound duration<select id="alarm-duration"><option value="30" ${(s?.settings.alarm_sound_seconds ?? 30) === 30 ? "selected" : ""}>30 seconds</option><option value="60" ${s?.settings.alarm_sound_seconds === 60 ? "selected" : ""}>1 minute</option><option value="0" ${s?.settings.alarm_sound_seconds === 0 ? "selected" : ""}>Until stopped</option></select></label><p class="hint">Only the sound stops. Dismiss the completed session with Stop Alarm.</p><label class="check-row"><input id="tick-sound" type="checkbox" ${s?.settings.tick_sound ? "checked" : ""}>Tick every second</label><label>Tick volume <output id="volume-output">${s?.settings.tick_volume ?? 100}%</output><input id="tick-volume" type="range" min="0" max="400" step="1" value="${s?.settings.tick_volume ?? 100}"></label><p class="hint">100% is the original volume. This does not change the alarm.</p></fieldset><div class="dialog-actions"><button type="button" id="cancel-preferences" class="secondary">Cancel</button><button type="submit" class="primary" ${editable ? "" : "disabled"}>Save preferences</button></div></form></div><div class="settings-section" ${view.backend === "local" ? "hidden" : ""}><h3>Your sync connection</h3><p class="muted">One timer. Every connected window.</p><form id="connection-form"><label>Server address<input id="endpoint" value="${escape(view.endpoint)}" spellcheck="false" placeholder="ws://127.0.0.1:4317/v1/ws" required></label><label>Access token<input id="token" type="password" autocomplete="off" placeholder="${view.has_token ? "Saved — leave blank to keep" : "Paste the token from your server"}"></label><p class="hint">Controls need a connection. Closing this window leaves the server timer running.</p><button type="submit" class="secondary" ${view.pending ? "disabled" : ""}>Save and connect</button></form></div><section class="settings-section" aria-label="About"><h3>About</h3><p>Pomo Restbank</p><p id="application-version" class="muted">Version: Loading...</p></section>`,
   );
   const versionLabel = modal.querySelector<HTMLElement>("#application-version")!;
   void applicationVersion.then((version) => {
@@ -1097,10 +1098,14 @@ function openSettings(connectionOnly = false) {
       const volume = Number(
         (document.querySelector("#tick-volume") as HTMLInputElement).value,
       );
+      const alarmDuration = Number(
+        document.querySelector<HTMLSelectElement>("#alarm-duration")!.value,
+      );
       settingsSaveRevision = view.snapshot!.state.revision;
       if (
         !(await command({
           type: "save_settings",
+          alarm_sound_seconds: alarmDuration,
           focus_scope: scope,
           tick_sound: tick,
           tick_volume: volume,

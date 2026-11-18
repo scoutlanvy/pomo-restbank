@@ -198,6 +198,7 @@ test("settings save sends shared preferences and does not save Cancel changes", 
   await page.getByRole("button", { name: "Save preferences" }).click();
   expect(await page.evaluate(() => (window as any)._commands.at(-1))).toEqual({
     type: "save_settings",
+    alarm_sound_seconds: 30,
     focus_scope: "per_subject",
     tick_sound: true,
     tick_volume: 250,
@@ -1547,4 +1548,16 @@ test("Settings About shows the runtime application version", async ({ page }) =>
   await expect(about).toContainText("Pomo Restbank");
   await expect(about).toContainText("Version 0.3.0");
   await expect(about).not.toContainText("License");
+});
+
+
+test("alarm duration defaults to 30 seconds and saves the selected duration", async ({ page }) => {
+  await mock(page);
+  await page.locator("#settings").click();
+  await expect(page.locator("#alarm-duration")).toHaveValue("30");
+  await page.locator("#alarm-duration").selectOption("60");
+  await page.getByRole("button", { name: "Save preferences", exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as any)._commands.at(-1))).toMatchObject({
+    type: "save_settings", alarm_sound_seconds: 60,
+  });
 });

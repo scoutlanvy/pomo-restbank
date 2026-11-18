@@ -427,10 +427,12 @@ try {
     focus_scope: "per_subject",
     tick_sound: false,
     tick_volume: 120,
+    alarm_sound_seconds: 60,
   });
   await until(
     async () =>
-      (await view(b.page)).snapshot.state.settings.tick_volume === 120,
+      (await view(b.page)).snapshot.state.settings.tick_volume === 120
+      && (await view(b.page)).snapshot.state.settings.alarm_sound_seconds === 60,
     "settings sync",
   );
   report.checks.push(

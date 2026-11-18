@@ -158,6 +158,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     apply(
         &mut s,
         Command::SaveSettings {
+            alarm_sound_seconds: None,
             manual_counts_toward_pomodoro: None,
             focus_scope: Scope::PerSubject,
             tick_sound: true,
@@ -170,6 +171,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     assert!(
         s.apply(
             &Command::SaveSettings {
+                alarm_sound_seconds: None,
                 manual_counts_toward_pomodoro: None,
                 focus_scope: Scope::Shared,
                 tick_sound: false,
@@ -192,6 +194,7 @@ fn scopes_retain_independent_progress_and_cannot_change_mid_focus() {
     apply(
         &mut s,
         Command::SaveSettings {
+            alarm_sound_seconds: None,
             manual_counts_toward_pomodoro: None,
             focus_scope: Scope::Shared,
             tick_sound: false,
@@ -368,4 +371,46 @@ fn old_manual_data_defaults_off_and_legacy_settings_preserve_choice() {
     .unwrap();
     apply(&mut s, command);
     assert!(s.settings.manual_counts_toward_pomodoro);
+}
+
+#[test]
+fn alarm_duration_defaults_validates_and_legacy_commands_preserve_it() {
+    let mut s = State::new(false);
+    let mut old = serde_json::to_value(&s).unwrap();
+    old["settings"]
+        .as_object_mut()
+        .unwrap()
+        .remove("alarm_sound_seconds");
+    s = serde_json::from_value(old).unwrap();
+    assert_eq!(s.settings.alarm_sound_seconds, 30);
+    for seconds in [0, 30, 60] {
+        apply(
+            &mut s,
+            Command::SaveSettings {
+                alarm_sound_seconds: Some(seconds),
+                manual_counts_toward_pomodoro: None,
+                focus_scope: Scope::Shared,
+                tick_sound: false,
+                tick_volume: 100,
+            },
+        );
+        let command = serde_json::from_str(r#"{"type":"save_settings","focus_scope":"shared","tick_sound":false,"tick_volume":100}"#).unwrap();
+        apply(&mut s, command);
+        assert_eq!(s.settings.alarm_sound_seconds, seconds);
+        s.validate().unwrap();
+    }
+    assert!(
+        s.apply(
+            &Command::SaveSettings {
+                alarm_sound_seconds: Some(45),
+                manual_counts_toward_pomodoro: None,
+                focus_scope: Scope::Shared,
+                tick_sound: false,
+                tick_volume: 100,
+            },
+            NOW
+        )
+        .is_err()
+    );
+    assert_eq!(s.settings.alarm_sound_seconds, 60);
 }

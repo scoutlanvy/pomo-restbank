@@ -262,6 +262,7 @@ async fn manual_completion_rolls_back_contribution_and_reward_then_retries_once(
     execute(
         &s,
         Command::SaveSettings {
+            alarm_sound_seconds: None,
             focus_scope: restbank_domain::Scope::Shared,
             tick_sound: false,
             tick_volume: 100,

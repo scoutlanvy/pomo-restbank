@@ -34,12 +34,18 @@ pub enum Scope {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Settings {
+    #[serde(default = "default_alarm_sound_seconds")]
+    pub alarm_sound_seconds: u16,
     #[serde(default)]
     pub manual_counts_toward_pomodoro: bool,
     pub focus_scope: Scope,
     pub tick_sound: bool,
     pub tick_volume: u16,
 }
+fn default_alarm_sound_seconds() -> u16 {
+    30
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Timer {
     #[serde(default)]
@@ -100,6 +106,8 @@ pub enum Command {
     StopAlarm,
     SaveSettings {
         #[serde(default)]
+        alarm_sound_seconds: Option<u16>,
+        #[serde(default)]
         manual_counts_toward_pomodoro: Option<bool>,
         focus_scope: Scope,
         tick_sound: bool,
@@ -120,6 +128,7 @@ impl State {
             || self.cycle_position > 3
             || self.shared_progress >= self.focus_seconds
             || self.settings.tick_volume > 400
+            || !matches!(self.settings.alarm_sound_seconds, 0 | 30 | 60)
             || self
                 .per_subject_progress
                 .values()
@@ -172,6 +181,7 @@ impl State {
             shared_progress: 0,
             per_subject_progress: BTreeMap::new(),
             settings: Settings {
+                alarm_sound_seconds: default_alarm_sound_seconds(),
                 manual_counts_toward_pomodoro: false,
                 focus_scope: Scope::Shared,
                 tick_sound: false,
@@ -426,6 +436,7 @@ impl State {
                 self.acknowledge_alarm();
             }
             Command::SaveSettings {
+                alarm_sound_seconds,
                 manual_counts_toward_pomodoro,
                 focus_scope,
                 tick_sound,
@@ -435,7 +446,16 @@ impl State {
                 if *tick_volume > 400 {
                     return Err("Tick volume must be 0–400%.".into());
                 }
+                let alarm_sound_seconds =
+                    alarm_sound_seconds.unwrap_or(self.settings.alarm_sound_seconds);
+                if !matches!(alarm_sound_seconds, 0 | 30 | 60) {
+                    return Err(
+                        "Choose an alarm duration of 30 seconds, 1 minute, or until stopped."
+                            .into(),
+                    );
+                }
                 self.settings = Settings {
+                    alarm_sound_seconds,
                     manual_counts_toward_pomodoro: manual_counts_toward_pomodoro
                         .unwrap_or(self.settings.manual_counts_toward_pomodoro),
                     focus_scope: *focus_scope,

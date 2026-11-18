@@ -2,6 +2,8 @@ use std::{
     collections::BTreeMap,
     io::Cursor,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    time::Duration,
 };
 pub struct Audio {
     dir: tempfile::TempDir,
@@ -10,6 +12,8 @@ pub struct Audio {
     pub alarm_id: Option<uuid::Uuid>,
     pub tick_sequence: Option<u64>,
     pub running: bool,
+    alarm_playback: Arc<Mutex<Option<uuid::Uuid>>>,
+    alarm_timeout: Option<tokio::task::JoinHandle<()>>,
 }
 impl Audio {
     pub fn cleanup(&mut self) {
@@ -31,6 +35,8 @@ impl Audio {
             alarm_id: None,
             tick_sequence: None,
             running: false,
+            alarm_playback: Arc::new(Mutex::new(None)),
+            alarm_timeout: None,
         })
     }
     pub fn prepare(&mut self, volume: u16) -> anyhow::Result<PathBuf> {
@@ -56,8 +62,31 @@ impl Audio {
         Ok(path)
     }
     pub fn stop(&mut self) {
+        if let Some(task) = self.alarm_timeout.take() {
+            task.abort();
+        }
+        let mut playback = self.alarm_playback.lock().unwrap();
+        *playback = None;
         play(None, false);
         self.running = false;
+    }
+    fn start_alarm(&mut self, seconds: u16) {
+        self.stop();
+        let generation = uuid::Uuid::new_v4();
+        *self.alarm_playback.lock().unwrap() = Some(generation);
+        play(Some(&self.alarm), true);
+        if seconds > 0 {
+            let playback = self.alarm_playback.clone();
+            self.alarm_timeout = Some(tokio::spawn(async move {
+                tokio::time::sleep(Duration::from_secs(u64::from(seconds))).await;
+                // Serialize with stop/start so an old timeout cannot silence a new sound.
+                let mut active = playback.lock().unwrap();
+                if *active == Some(generation) {
+                    play(None, false);
+                    *active = None;
+                }
+            }));
+        }
     }
     pub fn update(
         &mut self,
@@ -74,7 +103,7 @@ impl Audio {
         }
         if s.status == Status::Alarm {
             if !initial && s.alarm_id != self.alarm_id {
-                play(Some(&self.alarm), true);
+                self.start_alarm(s.settings.alarm_sound_seconds);
             }
             self.alarm_id = s.alarm_id;
             self.running = false;
@@ -105,7 +134,7 @@ impl Drop for Audio {
         self.stop();
     }
 }
-#[cfg(windows)]
+#[cfg(all(windows, not(test)))]
 fn play(path: Option<&Path>, looping: bool) {
     use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Media::Audio::PlaySoundW;
@@ -123,7 +152,7 @@ fn play(path: Option<&Path>, looping: bool) {
         );
     }
 }
-#[cfg(not(windows))]
+#[cfg(any(not(windows), test))]
 fn play(_path: Option<&Path>, _looping: bool) {}
 
 #[cfg(test)]
@@ -160,5 +189,65 @@ mod tests {
             audio.dir.path().to_path_buf()
         };
         assert!(!path.exists());
+    }
+}
+
+#[cfg(test)]
+mod alarm_tests {
+    use super::*;
+    use restbank_domain::{Command, State, Status};
+    use restbank_protocol::Snapshot;
+
+    fn alarm(seconds: u16) -> Snapshot {
+        let mut state = State::new(true);
+        state.settings.alarm_sound_seconds = seconds;
+        state.apply(&Command::Start { seconds: 0 }, "test").unwrap();
+        for _ in 0..10 {
+            state.tick("test");
+        }
+        Snapshot {
+            state,
+            server_time_ms: 0,
+            storage_error: None,
+            preview: true,
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn finite_alarm_stops_without_acknowledging_or_replaying() {
+        for seconds in [30, 60] {
+            let mut audio = Audio::new().unwrap();
+            let snapshot = alarm(seconds);
+            audio.update(&snapshot, false).unwrap();
+            tokio::task::yield_now().await;
+            tokio::time::advance(Duration::from_secs(u64::from(seconds - 1))).await;
+            assert!(audio.alarm_playback.lock().unwrap().is_some());
+            audio.update(&snapshot, false).unwrap();
+            tokio::time::advance(Duration::from_secs(1)).await;
+            tokio::task::yield_now().await;
+            assert!(audio.alarm_playback.lock().unwrap().is_none());
+            assert_eq!(snapshot.state.status, Status::Alarm);
+            audio.update(&snapshot, false).unwrap();
+            assert!(audio.alarm_playback.lock().unwrap().is_none());
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancelled_timeout_does_not_stop_next_alarm_and_initial_is_silent() {
+        let mut audio = Audio::new().unwrap();
+        audio.update(&alarm(30), true).unwrap();
+        assert!(audio.alarm_playback.lock().unwrap().is_none());
+        audio.update(&alarm(30), false).unwrap();
+        tokio::task::yield_now().await;
+        audio.stop();
+        let snapshot = alarm(0);
+        audio.update(&snapshot, false).unwrap();
+        tokio::time::advance(Duration::from_secs(120)).await;
+        tokio::task::yield_now().await;
+        assert!(audio.alarm_playback.lock().unwrap().is_some());
+        audio.stop();
+        assert!(audio.alarm_playback.lock().unwrap().is_none());
+        audio.update(&snapshot, true).unwrap();
+        assert!(audio.alarm_playback.lock().unwrap().is_none());
     }
 }
