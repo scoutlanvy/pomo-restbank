@@ -19,10 +19,10 @@ From the repository root:
 ```powershell
 npm.cmd --prefix desktop ci
 npm.cmd --prefix desktop run release
-.\dist\PomoRestbank-Launcher.exe
+.\dist\v0.3.0\PomoRestbank-Launcher.exe
 ```
 
-The build creates the desktop application, Rust launcher, optional server, NSIS installer, and portable ZIP in `dist/`. Open `pomo-restbank.exe` or `PomoRestbank-Launcher.exe`: **Local mode is the default**, including after upgrading an older installation. It runs the timer and SQLite in the desktop process without a separate server or network port. The client-only installer is sufficient for Local mode; Node.js is needed only for building.
+The build creates the desktop application, Rust launcher, optional server, NSIS installer, and portable ZIP in `dist/<tag>/` (for example `dist/v0.3.0/`). Replace `v0.3.0` in the commands below with your release tag. Open `pomo-restbank.exe` or `PomoRestbank-Launcher.exe`: **Local mode is the default**, including after upgrading an older installation. It runs the timer and SQLite in the desktop process without a separate server or network port. The client-only installer is sufficient for Local mode; Node.js is needed only for building.
 
 Identical executables are left in place. If a changed executable is in use, choose **Quit** on the exact application and rerun the build; packaging never stops processes automatically. A server process must be stopped separately when replacing its executable.
 
@@ -41,22 +41,22 @@ Choose **Settings → Application → Connection mode → Server**, save, then *
 For two clients on this computer:
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --backend server --profile first
-.\dist\PomoRestbank-Launcher.exe --backend server --profile second
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
 For two preview Server clients with separate data (use only `--preview` for one Local preview window):
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --backend server --preview --profile first
-.\dist\PomoRestbank-Launcher.exe --backend server --preview --profile second
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --preview --profile first
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --preview --profile second
 ```
 
 You can also start the executables yourself:
 
 ```powershell
-.\dist\pomo-restbank-server.exe
-.\dist\pomo-restbank.exe --backend server --profile first
+.\dist\v0.3.0\pomo-restbank-server.exe
+.\dist\v0.3.0\pomo-restbank.exe --backend server --profile first
 ```
 
 Open **Settings → Your sync connection**, enter `ws://127.0.0.1:4317/v1/ws`, and paste the contents of `%LOCALAPPDATA%\PomoRestbank\server\token.txt`. Preview uses port 4318 and `preview-server\token.txt`. The server prints the token file location, never the token itself. The client stores the token in its profile's `connection.json`; treat that file as private.
@@ -110,7 +110,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 npm.cmd --prefix desktop test
 ```
 
-Set `CARGO_TARGET_DIR` to a task-owned OS-temp directory to reuse an isolated packaging cache. Set a separate release destination with `npm.cmd --prefix desktop run release -- ABSOLUTE_OUTPUT_PATH`. This feature build is available under `dist/local-mode/`.
+Release builds automatically reuse a repository-specific cache under system Temp (`pomo-restbank-release-cache-<hash>`). Set `CARGO_TARGET_DIR` to override that location. Set a separate release destination with `npm.cmd --prefix desktop run release -- ABSOLUTE_OUTPUT_PATH`. This feature build is available under `dist/local-mode/`.
 
 UI tests use Microsoft Edge and mocked Tauri IPC. Native smoke tests use real WebView2 windows, Rust IPC, two clients, and a real server. See PROJECT_OVERVIEW.md and VALIDATION.md for architecture and measured verification. Source is MIT licensed; audio and icon are retained from the Python reference.
 
@@ -149,3 +149,6 @@ Credits and rewards are committed atomically on completion or Reset, never durin
 
 
 Settings > Timer preferences > **Alarm sound duration** offers 30 seconds (default), 1 minute, or Until stopped. This applies to Manual, focus and break completion. Only the sound stops automatically: the completed timer still waits for Stop Alarm, and no next timer starts automatically. The saved backend preference is shared across Server clients. Existing data defaults to 30 seconds; omitted command fields preserve the saved duration. Audio deadlines run independently of UI updates and are cancelled on stop, disconnect or exit.
+
+
+Each release tag has its own output directory; building a newer version preserves older version directories. Rebuilding the same tag updates that tag's directory. An explicit output argument remains the exact destination, without an added tag directory. Build logs print output/cache locations before compilation. Cache files may grow, are disposable, and do not contain application databases. Do not run releases concurrently in the same checkout. Existing dist files and older caches are not moved or deleted automatically. Different executable versions still use the same normal application data unless explicitly isolated.

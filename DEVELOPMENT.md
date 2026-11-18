@@ -20,7 +20,7 @@ Berhenti: **Quit** di tray/Settings, lalu Ctrl+C di terminal. Tombol X secara de
 | `npm.cmd --prefix desktop run dev:frontend` | Vite saja; timer native tidak berjalan di browser |
 | `npm.cmd --prefix desktop run build` | Pemeriksaan TypeScript dan build frontend |
 | `npm.cmd --prefix desktop test` | Tes UI dengan mock Tauri IPC |
-| `npm.cmd --prefix desktop run release` | Paket aplikasi ke `dist/`; perlu tag versi pada HEAD |
+| `npm.cmd --prefix desktop run release` | Paket aplikasi ke `dist/<tag>/`; perlu tag versi pada HEAD |
 
 Pemanggilan langsung `run tauri -- dev` melewati isolasi dan dapat memakai data utama.
 e-smoke.mjs --build-dir PATH_TO_BUILD_OUTPUT.
@@ -34,3 +34,6 @@ npm.cmd --prefix desktop test
 
 
 Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau dari commit aktif, dengan akhiran `-dev` (contoh `0.3.0-dev`). Tanpa tag, versi konfigurasi menjadi dasar. Mulai ulang perintah dev setelah membuat tag baru. Release tetap memakai tepat satu tag pada HEAD tanpa akhiran dev; konfigurasi terlacak tidak diubah.
+
+
+Release memakai cache Temp tetap per repository: `pomo-restbank-release-cache-<hash>`. Override opsional: `CARGO_TARGET_DIR`. Hasil default masuk `dist/<tag>/`; argumen output eksplisit dipakai persis tanpa subfolder tambahan. Jangan jalankan dua release bersamaan dalam checkout yang sama. Cache dan hasil versi lama tidak dihapus otomatis.

@@ -1,15 +1,15 @@
 import { spawnSync } from 'node:child_process';
-import { readFile, writeFile, mkdir, readdir, copyFile, mkdtemp } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, copyFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { releaseVersion } from './release-version.mjs';
+import { releasePaths } from './release-paths.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const { tag, version } = releaseVersion(root);
 console.log(`Release version: ${version} (Git tag ${tag})`);
-const output = resolve(process.argv[2] ?? join(root, 'dist'));
-const target = process.env.CARGO_TARGET_DIR ? resolve(process.env.CARGO_TARGET_DIR) : await mkdtemp(join(tmpdir(), 'pomo-restbank-release-'));
+const { output, target } = releasePaths(root, tag, process.argv[2], process.env.CARGO_TARGET_DIR);
+console.log(`Release destination: ${output}\nReusable build cache: ${target}`);
 const env = { ...process.env, CARGO_TARGET_DIR: target };
 const npmCli = process.env.npm_execpath ?? join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js');
 function run(program, args, cwd = root) {

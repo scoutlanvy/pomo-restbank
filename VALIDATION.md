@@ -169,3 +169,10 @@ Frontend TypeScript/Vite build, all workspace Rust tests (37 tests), rustfmt che
 The updated Server native suite passed, including duration synchronization. Local native checks passed in the final isolated run: status remained Alarm after 31 seconds, Settings saved 60 seconds, and that preference survived restart. Evidence is retained under OS-temp pomo-local-native-xbwmL0; debug artifacts/reports remain under pomo-restbank-space-alarm-20261117-target/debug. No release installer was built and no installed user application/data was replaced. The native test exercised playback paths, not microphone capture or subjective audio verification.
 
 Earlier Local attempts are retained as evidence: concurrent execution observed an unexpected Idle state after the wait (cause not established); an isolated rerun passed the timed check but encountered a stale CDP connection during restart. The restart helper now allocates a fresh debugger port, and the final isolated suite passed. Earlier roots: pomo-local-native-vIuVLa and pomo-local-native-mw89pg. Test teardown removed its isolated databases; reports/screenshots/build caches remain. WebView2 teardown class-unregistration diagnostics did not fail the final checks.
+
+
+## Reusable release cache and versioned output - 18 November 2026
+
+Release defaults now resolve to a stable repository-specific Temp cache and dist/<tag>/ output. Explicit CARGO_TARGET_DIR and output arguments preserve their previous meaning. Existing release files, caches and user data are not moved or deleted. dist remains ignored; no gitignore change was needed.
+
+All three Node tests in release-paths.test.mjs and release-version.test.mjs passed: separate output by tag, cache reuse across tags, isolation between repositories, explicit path overrides, and release-tag validation. JavaScript syntax and whitespace checks passed. No full Rust compilation, installer packaging, cache cleanup, or timing benchmark was run for this path-only change. First use of the new default cache still requires compilation; later builds can reuse it.

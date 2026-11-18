@@ -13,10 +13,10 @@ Jalankan dari root proyek:
 ```powershell
 npm.cmd --prefix desktop ci
 npm.cmd --prefix desktop run release
-.\dist\PomoRestbank-Launcher.exe
+.\dist\v0.3.0\PomoRestbank-Launcher.exe
 ```
 
-Build menghasilkan aplikasi, launcher Rust, server opsional, installer NSIS, dan ZIP portable di `dist/`. Buka `pomo-restbank.exe` atau `PomoRestbank-Launcher.exe`: **mode Lokal menjadi default**, termasuk setelah memperbarui instalasi lama. Timer dan SQLite berjalan di dalam aplikasi tanpa proses server terpisah atau port jaringan. Installer yang memasang klien saja sudah cukup untuk mode Lokal; Node.js hanya diperlukan untuk build.
+Build menghasilkan aplikasi, launcher Rust, server opsional, installer NSIS, dan ZIP portable di `dist/<tag>/`, misalnya `dist/v0.3.0/`. Sesuaikan `v0.3.0` pada contoh perintah dengan tag rilis yang dipakai. Buka `pomo-restbank.exe` atau `PomoRestbank-Launcher.exe`: **mode Lokal menjadi default**, termasuk setelah memperbarui instalasi lama. Timer dan SQLite berjalan di dalam aplikasi tanpa proses server terpisah atau port jaringan. Installer yang memasang klien saja sudah cukup untuk mode Lokal; Node.js hanya diperlukan untuk build.
 
 Build melewati executable yang identik. Jika executable berubah dan sedang dipakai, pilih **Quit** pada aplikasi yang memakai file itu sebelum build ulang; packaging tidak menghentikan proses otomatis. Server perlu dihentikan terpisah saat mengganti executable server.
 
@@ -35,8 +35,8 @@ Pilih **Settings → Application → Connection mode → Server**, simpan, lalu 
 Untuk dua jendela mode Server, gunakan profil berbeda:
 
 ```powershell
-.\dist\PomoRestbank-Launcher.exe --backend server --profile first
-.\dist\PomoRestbank-Launcher.exe --backend server --profile second
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
 Tambahkan `--preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Bisa juga klik dua kali `PomoRestbank-Launcher.exe`; pengguna tidak memerlukan Node.js atau skrip PowerShell. Launcher harus berada di samping executable klien; mode Server lokal juga memerlukan executable server. Installer NSIS sudah cukup untuk Lokal; ZIP portable menyertakan launcher dan server.
@@ -83,7 +83,7 @@ Data baru disimpan di `%LOCALAPPDATA%\PomoRestbank`: `local`, `preview-local`, `
 
 LAN dapat diaktifkan dengan server `--listen 0.0.0.0:4317`; klien lain memakai IP LAN server dan token yang sama. Mode ini hanya untuk jaringan pribadi tepercaya, belum untuk internet publik. Android, TLS/hosting publik, penggabungan perubahan offline ke server, dan impor data Python belum termasuk versi ini.
 
-Atur `CARGO_TARGET_DIR` ke direktori milik tugas di Temp untuk memakai ulang cache packaging terisolasi. Lokasi rilis bisa dipilih dengan `npm.cmd --prefix desktop run release -- PATH_OUTPUT_ABSOLUT`. Build fitur ini tersedia di `dist/local-mode/`.
+Release otomatis memakai ulang cache khusus repository di Temp (`pomo-restbank-release-cache-<hash>`). `CARGO_TARGET_DIR` tetap dapat dipakai untuk menentukan lokasi cache sendiri. Lokasi rilis bisa dipilih dengan `npm.cmd --prefix desktop run release -- PATH_OUTPUT_ABSOLUT`. Build fitur ini tersedia di `dist/local-mode/`.
 
 Lihat README.md untuk perintah pengujian, PROJECT_OVERVIEW.md untuk rincian teknis, dan VALIDATION.md untuk hasil pemeriksaan aktual.
 
@@ -125,3 +125,6 @@ Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau 
 
 
 Settings > Timer preferences > **Alarm sound duration** menyediakan 30 seconds (default), 1 minute, dan Until stopped. Berlaku untuk Manual, fokus Pomodoro, dan istirahat. Hanya suara yang berhenti otomatis; status selesai tetap menunggu Stop Alarm dan sesi berikutnya tidak berjalan otomatis. Pilihan disimpan di backend dan tersinkron antar-klien Server. Data lama memakai default 30 detik. Penghentian suara tidak bergantung pada pembaruan UI; jadwal dibatalkan saat Stop Alarm, Reset, koneksi terputus, atau aplikasi keluar.
+
+
+Setiap tag rilis memiliki folder hasil sendiri; versi baru tidak menimpa folder versi lama. Build ulang tag yang sama memperbarui folder tag tersebut. Argumen lokasi output tetap menjadi tujuan persisnya, tanpa tambahan subfolder tag. Lokasi output/cache dicetak sebelum kompilasi. Cache bisa membesar dan boleh dibangun ulang; cache tidak berisi database pengguna. Jangan menjalankan release bersamaan dalam checkout yang sama. File dist dan cache lama tidak dipindahkan atau dihapus otomatis. EXE versi berbeda tetap memakai data aplikasi normal yang sama kecuali diisolasi secara eksplisit.
