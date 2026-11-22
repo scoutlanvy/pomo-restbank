@@ -36,7 +36,11 @@ beberapa klien. Kedua mode menyimpan data melalui SQLite.
 │   │   ├── main.ts                 # Inisialisasi, pembaruan state, dan koordinasi UI
 │   │   ├── ipc-types.ts            # Tipe state, perintah, dan hasil IPC
 │   │   ├── window-layout.ts        # Ukuran dan posisi jendela native
-│   │   ├── style.css               # Tema dan layout antarmuka
+│   │   ├── style.css               # Titik masuk stylesheet dan urutan impor
+│   │   ├── styles/
+│   │   │   ├── base.css            # Tema, shell, kontrol bersama, dan dialog
+│   │   │   ├── workspace.css       # Panel timer, subjek, saldo, dan riwayat
+│   │   │   └── layouts.css         # Aturan Full, Compact, dan jendela sempit
 │   │   └── ui/
 │   │       ├── shell.ts            # Header, banner, profil, dan tema
 │   │       ├── settings.ts         # Preferensi, koneksi Server, dan setup Local
@@ -100,6 +104,10 @@ Dialog, pengiriman perintah, dan utilitas DOM serta markup digunakan lintas fitu
 dan berada langsung di `ui/`. `compact-layout.ts` mengatur layout shell dan
 workspace, serta menggunakan `window-layout.ts` untuk mengubah ukuran dan posisi
 jendela Windows.
+
+`style.css` memuat `base.css`, `workspace.css`, lalu `layouts.css`. Urutan ini
+menempatkan aturan layout setelah gaya dasar dan komponen agar penyesuaian Full,
+Compact, dan jendela sempit diterapkan sesuai cascade.
 
 Pembagian tanggung jawab runtime, aturan timer, dan protokol sinkronisasi
 dijelaskan di [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). Perintah untuk
