@@ -5,6 +5,16 @@ TypeScript dan CSS. Mode Local memakai mesin timer di aplikasi desktop.
 Mode Server memakai mesin yang sama melalui WebSocket untuk menyinkronkan
 beberapa klien. Kedua mode menyimpan data melalui SQLite.
 
+## Alur runtime
+
+```text
+Frontend TypeScript
+        ↕ Tauri IPC
+Backend desktop (Rust)
+  ├─ Local  ↔ Engine ↔ SQLite lokal
+  └─ Server ↔ WebSocket ↔ Server Rust ↔ Engine ↔ SQLite server
+```
+
 ## Struktur direktori
 
 ```text
@@ -96,9 +106,10 @@ beberapa klien. Kedua mode menyimpan data melalui SQLite.
 └── ARCHITECTURE.md                 # Peta kode dan tanggung jawab modul
 ```
 
-`main.ts` menerima snapshot melalui Tauri dan mengoordinasikan pembaruan UI
-serta pemuatan riwayat. Modul di `ui/` mengelola DOM, event handler, dan state
-sementara masing-masing fitur. `ui/workspace/` memuat template panel timer dan
+Engine mengelola state timer. `main.ts` menerima snapshot melalui Tauri dan
+mengoordinasikan pembaruan UI serta pemuatan riwayat. Modul di `ui/` mengelola
+DOM, event handler, dan state sementara masing-masing fitur. `ui/workspace/`
+memuat template panel timer dan
 modul yang mengelola kontrol timer, subjek, dan tampilan riwayat dalam panel itu.
 Dialog, pengiriman perintah, dan utilitas DOM serta markup digunakan lintas fitur
 dan berada langsung di `ui/`. `compact-layout.ts` mengatur layout shell dan
