@@ -1,0 +1,7 @@
+{
+  "name": "pomo-restbank",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix desktop run dev"
+  }
+}

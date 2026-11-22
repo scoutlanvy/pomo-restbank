@@ -6,8 +6,10 @@ Prasyarat: Windows 10/11, WebView2, Node.js >=22.12, Rust MSVC, C++ Build Tools 
 
 ```powershell
 npm.cmd --prefix desktop ci
-npm.cmd --prefix desktop run dev
+npm run dev
 ```
+
+Jika PowerShell memblokir `npm.ps1`, gunakan `npm.cmd run dev`.
 
 **Pomo Restbank [DEV]** mendukung hot reload frontend dan kompilasi ulang Rust. Data, pengaturan, dan cache build terisolasi di `%TEMP%/pomo-restbank-dev-<hash-repository>/` (lokasi dicetak di terminal), sehingga aplikasi utama boleh tetap berjalan. Data dev bertahan hingga Temp dibersihkan.
 
