@@ -5,119 +5,17 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { WindowLayout } from "./window-layout";
 
-type Mode = "manual" | "pomodoro";
-type Status = "idle" | "running" | "paused" | "choice" | "alarm";
-type Scope = "shared" | "per_subject";
-type Timer = {
-  counts_toward_pomodoro?: boolean;
-  phase: "manual" | "focus" | "break";
-  total_seconds: number;
-  remaining_seconds: number;
-  subject: string;
-  suspended_focus: Timer | null;
-  return_to_choice: boolean;
-};
-type State = {
-  revision: number;
-  tick_sequence: number;
-  mode: Mode;
-  subject: string;
-  status: Status;
-  timer: Timer | null;
-  balance_seconds: number;
-  cycle_position: number;
-  shared_progress: number;
-  per_subject_progress: Record<string, number>;
-  settings: {
-    alarm_sound_seconds?: number;
-    manual_counts_toward_pomodoro?: boolean;
-    focus_scope: Scope;
-    tick_sound: boolean;
-    tick_volume: number;
-  };
-  subjects: string[];
-  focus_seconds: number;
-  alarm_id: string | null;
-};
-type Snapshot = {
-  state: State;
-  server_time_ms: number;
-  storage_error: string | null;
-  preview: boolean;
-};
-type Backend = "local" | "server";
-type CloseBehavior = "tray" | "quit";
-type View = {
-  snapshot: Snapshot | null;
-  connection: string;
-  endpoint: string;
-  has_token: boolean;
-  pending: string | null;
-  error: string | null;
-  profile: string;
-  preview: boolean;
-  backend?: Backend;
-  next_backend?: Backend;
-  close_behavior?: CloseBehavior;
-  initializing?: boolean;
-  import_available?: boolean;
-  tray_available?: boolean;
-  backup_path?: string | null;
-};
-type Session = {
-  session_id: string;
-  subject: string;
-  duration_seconds: number;
-  recorded_at: string;
-  mode: Mode;
-};
-type Summary = { subject: string; duration_seconds: number; count: number };
-type History = { type: "history"; sessions: Session[]; summary: Summary[] };
-type Command = { type: string; [key: string]: string | number | boolean };
-const icon = (name: string) => {
-  const paths: Record<string, string> = {
-    compact:
-      '<rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 9h6v6H9Z"/>',
-    expand: '<path d="M14 4h6v6M20 4l-7 7M10 20H4v-6M4 20l7-7"/>',
-    chevron: '<path d="m6 9 6 6 6-6"/>',
-    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/>',
-    settings:
-      '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2.5"/><circle cx="15" cy="17" r="2.5"/>',
-    history: '<path d="M4 10a8 8 0 1 1 1 7M4 4v6h6M12 7v5l3 2"/>',
-    cup: '<path d="M4 8h12v7a5 5 0 0 1-10 0V8M16 9h2a3 3 0 0 1 0 6h-2M5 21h12M8 3v2M12 3v2"/>',
-    target:
-      '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r=".7"/>',
-    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
-    reset: '<path d="M4 9a8 8 0 1 1 1 9M4 3v6h6"/>',
-    pause: '<path d="M9 5v14M15 5v14"/>',
-    play: '<path d="m8 5 11 7-11 7Z"/>',
-    plus: '<path d="M12 5v14M5 12h14"/>',
-    close: '<path d="m6 6 12 12M6 18 18 6"/>',
-    trash: '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>',
-    link: '<path d="m10 13 4-4M8 15l-2 2a4 4 0 0 1-5-5l4-4a4 4 0 0 1 6 0m2 1 2-2a4 4 0 0 1 5 5l-4 4a4 4 0 0 1-6 0"/>',
-  };
-  return `<svg viewBox="0 0 24 24" aria-hidden="true">${paths[name] ?? paths.clock}</svg>`;
-};
-const escape = (s: string) =>
-  s.replace(
-    /[&<>"']/g,
-    (c) =>
-      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
-        c
-      ]!,
-  );
+import type { Command, History, State, Status, View } from "./ipc-types";
+import { createHistoryView } from "./history-view";
+import { escape, icon } from "./markup";
+import { workspaceMarkup } from "./workspace-markup";
+
 export const formatTime = (n: number) => {
   n = Math.max(0, Math.floor(n));
   return [Math.floor(n / 3600), Math.floor(n / 60) % 60, n % 60]
     .map((v) => String(v).padStart(2, "0"))
     .join(":");
 };
-const duration = (n: number) =>
-  n < 60
-    ? `${n}s`
-    : n < 3600
-      ? `${Math.floor(n / 60)}m ${String(n % 60).padStart(2, "0")}s`
-      : `${Math.floor(n / 3600)}h ${Math.floor(n / 60) % 60}m`;
 let view: View = {
   snapshot: null,
   connection: "disconnected",
@@ -135,7 +33,6 @@ let compactDetails = false;
 let stagedCompactDetails: boolean | null = null;
 let layoutChanging = false;
 const windowLayout = new WindowLayout();
-let historyTab = "recent";
 let localError: string | null = null;
 let manual = [0, 0, 0];
 let snapshotArrived = performance.now();
@@ -151,19 +48,10 @@ let pendingFeedbackVisible = false;
 let pendingFeedbackTimer: number | undefined;
 const markupCache = new WeakMap<Element, string>();
 let renderedSubjects = "";
-let renderedHistory: History | null | undefined;
-let renderedHistoryTab = "";
-let renderedHistoryConnected: boolean | undefined;
-const historyDateFormat = new Intl.DateTimeFormat("en-GB", {
-  timeZone: "Asia/Jakarta",
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
 const root = document.querySelector<HTMLDivElement>("#app")!;
 root.innerHTML = `<header class="topbar"><a class="brand" href="#" aria-label="Pomo Restbank home"><span class="brandmark">${icon("cup")}</span><span>Pomo <strong>Restbank</strong></span></a><div class="header-actions"><button class="icon-button" id="compact-toggle" disabled aria-label="Enter compact mode" title="Compact mode">${icon("compact")}</button><button class="icon-button" id="theme" aria-label="Toggle color theme">${icon("sun")}</button><button class="icon-button" id="settings" aria-label="Open settings">${icon("settings")}</button></div></header><main><div id="banner" role="status" aria-live="polite"></div><div id="workspace"></div></main><footer><span>Build focus. Bank your breaks.</span><span id="profile-label"></span></footer><dialog id="modal"><div id="modal-content"></div></dialog>`;
 const workspace = document.querySelector<HTMLDivElement>("#workspace")!;
+const historyView = createHistoryView(workspace, loadHistory);
 const modal = document.querySelector<HTMLDialogElement>("#modal")!;
 const modalContent = document.querySelector<HTMLDivElement>("#modal-content")!;
 const headerActions = document.querySelector<HTMLElement>(".header-actions")!;
@@ -189,7 +77,7 @@ async function changeLayout(
     // Restoring hidden in the same task prevents an intermediate painted layout.
     let detailsHeight: number | undefined;
     if (compact && nextCompact && details) {
-      renderCompactHistory();
+      historyView.renderCompactHistory(history, connected());
       detailsHeight = measureCompactDetails();
     }
     if (compact && nextCompact) {
@@ -482,8 +370,7 @@ function syncDialogControls() {
 }
 function buildWorkspace() {
   renderedSubjects = "";
-  renderedHistory = undefined;
-  workspace.innerHTML = `<section class="timer-panel panel"><div class="section-top"><span class="compact-phase compact-only"></span><div class="panel-heading"><span class="eyebrow"></span>${pendingFeedbackMarkup("retry-pending")}</div><button id="connection-status" title="Connection settings"><i></i><span></span></button></div><div class="compact-subject compact-only"><strong></strong><span></span></div><div class="mode-tabs" role="group" aria-label="Timer mode"><button data-mode="manual">Manual</button><button data-mode="pomodoro">Pomodoro</button></div><div class="subject-row"><label for="subject">I'm focusing on</label><div class="subject-controls"><button id="subject" class="subject-picker" aria-haspopup="listbox" aria-expanded="false"><span class="subject-name"></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 10 5 5 5-5"/></svg></button><div id="subject-popup" class="subject-popup" popover="auto" role="listbox" aria-label="Study subjects"><div id="subject-menu" class="subject-context" role="menu" hidden><button role="menuitem" id="context-delete">Remove subject</button></div></div><button id="add-subject" class="icon-button small" aria-label="Add subject">${icon("plus")}</button><button id="delete-subject" class="icon-button small" aria-label="Delete selected subject">${icon("trash")}</button></div></div><div class="timer-face"><svg class="progress-ring" viewBox="0 0 300 300" aria-hidden="true"><circle class="ring-track" cx="150" cy="150" r="137"/><circle class="ring-fill" cx="150" cy="150" r="137" style="stroke-dasharray:860.8"/></svg><div class="timer-content"><span class="phase-icon"></span><div id="countdown" class="countdown" aria-label="Time remaining"></div><span class="timer-caption"></span><span id="estimate" class="estimate"></span></div></div><div class="duration-fields" aria-label="Manual duration">${["Hours", "Minutes", "Seconds"].map((name, i) => `<label><span class="drag-label" data-index="${i}">${name}</span><input id="duration-${i}" aria-label="${name}" inputmode="numeric" maxlength="2" value="${String(manual[i]).padStart(2, "0")}"></label>`).join('<span class="colon">:</span>')}</div><div id="manual-contribution"><label class="check-row"><input id="manual-counts" type="checkbox" role="switch">Count toward Pomodoro</label><p class="hint">Completed time and time saved by Reset count toward your focus target.</p></div><div class="balance-control"><button id="balance-toggle" class="secondary" popovertarget="balance-menu" aria-expanded="false" aria-controls="balance-menu">${icon("cup")}Break balance <strong id="balance-value"></strong>${icon("chevron")}</button><div id="balance-menu" popover="auto" aria-label="Break options"><div class="break-actions"><button id="break-all" class="secondary">${icon("cup")}Use break balance</button><button id="break-choose" class="text-button">${icon("clock")}<span>Choose duration\u2026</span>${icon("chevron")}</button></div></div></div><div class="timer-actions"><button id="primary" class="primary"></button><button id="reset" class="secondary">${icon("reset")}Reset</button></div><button id="skip" class="text-button">Skip break</button><div class="compact-footer compact-only"><span>Break balance <strong id="compact-balance"></strong></span><button id="compact-detail-toggle" class="text-button" aria-expanded="false" aria-controls="compact-details">Details ${icon("chevron")}</button></div><div id="compact-details" class="compact-only" role="region" aria-label="Timer details"></div><div class="panel-bottom"><section id="compact-history-preview" class="compact-only" aria-label="Recent history"><div class="compact-history-heading"><span>${icon("history")}History</span><button id="compact-history" class="text-button">View all</button></div><div id="compact-history-list" aria-live="polite"></div></section><button id="history-toggle" class="text-button"></button></div></section><section id="history-panel" class="panel history-panel" hidden></section>`;
+  workspace.innerHTML = workspaceMarkup(manual, pendingFeedbackMarkup("retry-pending"));
   workspace
     .querySelector("#connection-status")!
     .addEventListener("click", () => openSettings(true));
@@ -507,7 +394,7 @@ function buildWorkspace() {
     .addEventListener("click", () => changeLayout(true, !compactDetails));
   workspace.querySelector("#compact-history")!.addEventListener("click", () => {
     if (layoutChanging) return;
-    historyTab = "recent";
+    historyView.selectRecent();
     void changeLayout(false, false, true);
   });
   const balanceMenu = workspace.querySelector<HTMLElement>("#balance-menu")!;
@@ -774,8 +661,8 @@ function render() {
   );
   workspace.querySelector<HTMLElement>("#history-panel")!.hidden =
     compact || !historyVisible;
-  if (historyVisible) renderHistory();
-  if (compact && compactDetails) renderCompactHistory();
+  if (historyVisible) historyView.renderHistory(history, connected());
+  if (compact && compactDetails) historyView.renderCompactHistory(history, connected());
   syncDialogControls();
   renderPendingFeedback();
   updateCountdown();
@@ -1138,21 +1025,6 @@ function openSettings(connectionOnly = false) {
   if (connectionOnly && view.backend !== "local")
     document.querySelector<HTMLInputElement>("#endpoint")!.focus();
 }
-let compactHistoryMarkup = "";
-function renderCompactHistory() {
-  const list = workspace.querySelector<HTMLElement>("#compact-history-list")!;
-  const markup = !connected()
-    ? '<p class="empty-state">Reconnect to load your history.</p>'
-    : !history
-      ? '<p class="empty-state">Loading your sessions\u2026</p>'
-      : history.sessions.length
-        ? history.sessions.slice(0, 3).map((session) => `<div class="history-row"><div><strong title="${escape(session.subject)}">${escape(session.subject)}</strong><span>${escape(historyDateFormat.format(new Date(session.recorded_at)))}</span></div><strong>${duration(session.duration_seconds)}</strong></div>`).join("")
-        : '<p class="empty-state">No sessions yet.</p>';
-  if (markup !== compactHistoryMarkup || list.innerHTML === "") {
-    list.innerHTML = markup;
-    compactHistoryMarkup = markup;
-  }
-}
 let compactFitFrame = 0;
 let lastCompactHeight: number | null = null;
 function measureCompactDetails(): number {
@@ -1197,62 +1069,6 @@ compactSizeObserver.observe(document.querySelector("#banner")!);
 
 async function loadHistory() {
   await call("request_history");
-}
-function renderHistory() {
-  const panel = document.querySelector("#history-panel");
-  if (!panel) return;
-  if (!panel.querySelector("#history-list")) {
-    panel.innerHTML = `<div class="history-heading"><div><span class="eyebrow">A LITTLE PROGRESS, EVERY DAY</span><h2>Your focus, remembered</h2></div><button id="refresh-history" class="icon-button" aria-label="Refresh history">${icon("reset")}</button></div><div class="history-tabs"><button data-tab="recent" class="${historyTab === "recent" ? "active" : ""}">Recent sessions</button><button data-tab="summary" class="${historyTab === "summary" ? "active" : ""}">By subject</button></div><div id="history-list"></div>`;
-    panel
-      .querySelectorAll<HTMLButtonElement>("[data-tab]")
-      .forEach((button) => {
-        button.addEventListener("click", () => {
-          historyTab = button.dataset.tab!;
-          renderHistory();
-        });
-      });
-    panel
-      .querySelector("#refresh-history")!
-      .addEventListener("click", loadHistory);
-  }
-  if (
-    renderedHistory === history &&
-    renderedHistoryTab === historyTab &&
-    renderedHistoryConnected === connected()
-  )
-    return;
-  renderedHistory = history;
-  renderedHistoryTab = historyTab;
-  renderedHistoryConnected = connected();
-  panel.querySelectorAll<HTMLButtonElement>("[data-tab]").forEach((button) => {
-    const active = button.dataset.tab === historyTab;
-    button.classList.toggle("active", active);
-    button.setAttribute("aria-pressed", String(active));
-  });
-  const list = panel.querySelector("#history-list")!;
-  if (!connected())
-    list.innerHTML =
-      '<p class="empty-state">Reconnect to load your history.</p>';
-  else if (!history)
-    list.innerHTML = '<p class="empty-state">Loading your sessions…</p>';
-  else if (historyTab === "recent")
-    list.innerHTML = history.sessions.length
-      ? history.sessions
-          .map(
-            (s) =>
-              `<div class="history-row"><span class="session-icon">${icon("clock")}</span><div><strong>${escape(s.subject)}</strong><span>${escape(historyDateFormat.format(new Date(s.recorded_at)))} · ${s.mode === "manual" ? "Manual" : "Pomodoro"}</span></div><strong>${duration(s.duration_seconds)}</strong></div>`,
-          )
-          .join("")
-      : '<p class="empty-state">Your first session starts a story.<br>Finish a timer to see it here.</p>';
-  else
-    list.innerHTML = history.summary.length
-      ? history.summary
-          .map(
-            (s) =>
-              `<div class="history-row"><span class="session-icon">${icon("target")}</span><div><strong>${escape(s.subject)}</strong><span>${s.count} ${s.count === 1 ? "session" : "sessions"}</span></div><strong>${duration(s.duration_seconds)}</strong></div>`,
-          )
-          .join("")
-      : '<p class="empty-state">No sessions yet.</p>';
 }
 const finishTimeFormat = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -1366,8 +1182,8 @@ async function boot() {
   await listen<View>("restbank:view", (event) => applyView(event.payload));
   await listen<History>("restbank:history", (event) => {
     history = event.payload;
-    if (historyVisible) renderHistory();
-    if (compact && compactDetails) renderCompactHistory();
+    if (historyVisible) historyView.renderHistory(history, connected());
+    if (compact && compactDetails) historyView.renderCompactHistory(history, connected());
   });
   const initial = await call<View>("get_view");
   if (initial) applyView(initial);
