@@ -1254,6 +1254,12 @@ function renderHistory() {
           .join("")
       : '<p class="empty-state">No sessions yet.</p>';
 }
+const finishTimeFormat = new Intl.DateTimeFormat("en-GB", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+});
+
 function updateCountdown() {
   const s = view.snapshot?.state;
   if (!s) return;
@@ -1280,7 +1286,10 @@ function updateCountdown() {
       ring.style.strokeDashoffset = offset;
   }
   const estimate = document.querySelector("#estimate");
-  if (estimate)
+  if (s.status === "idle" && remaining > 0 && connected()) {
+    const finishTime = finishTimeFormat.format(Date.now() + remaining * 1000);
+    setText(estimate, `Ends at ${finishTime}`);
+  } else if (estimate) {
     estimate.textContent = !connected()
       ? remaining === 0
         ? view.backend === "local" ? "Waiting for timer" : "Waiting for server"
@@ -1288,6 +1297,7 @@ function updateCountdown() {
       : s.status === "running" && (remaining === 0 || elapsed > 2)
         ? view.backend === "local" ? "Waiting for timer" : "Waiting for server"
         : "\u00a0";
+  }
 }
 document.addEventListener("keydown", (e) => {
   if (
