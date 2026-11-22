@@ -1,4 +1,4 @@
-import type { History } from "./ipc-types";
+import type { History } from "../ipc-types";
 import { escape, icon } from "./markup";
 
 const historyDateFormat = new Intl.DateTimeFormat("en-GB", {

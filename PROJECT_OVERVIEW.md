@@ -38,7 +38,7 @@ Each profile owns a SQLite snapshot cache, connection.json, file lock, and isola
 
 ## UI and audio
 
-The TypeScript entry point coordinates Tauri IPC, timer actions, and layout changes. The workspace template defines the stable timer controls. The history view renders the full panel and compact preview, owns tab selection, and uses the refresh callback supplied by the entry point. IPC payload types live together in `desktop/src/ipc-types.ts`.
+The TypeScript entry point subscribes to Tauri view and history events, then coordinates UI updates and history refreshes. Modules in `desktop/src/ui/` own timer controls, subjects, settings, dialog behavior, command submission, and compact layout transitions. The workspace template defines the stable timer controls. The history view renders the full panel and compact preview, owns tab selection, and uses the refresh callback supplied by the entry point. IPC payload types live together in `desktop/src/ipc-types.ts`.
 
 Space invokes Start Focus in Idle Pomodoro mode and the primary action for Running, Paused, and Alarm states (Pause, Resume, and Stop Alarm). Held/repeated presses issue at most one command until release; inputs, interactive controls, and open dialogs retain their normal keyboard behavior. Idle Manual and Choice do not start timers through this shortcut. Existing connection, pending, and storage guards apply in both layouts. Enter retains normal control behavior.
 
