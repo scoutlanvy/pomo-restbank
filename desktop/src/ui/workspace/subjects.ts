@@ -1,8 +1,8 @@
-import type { State } from "../ipc-types";
-import type { Commands } from "./commands";
-import type { Dialog } from "./dialog";
-import { setText } from "./dom";
-import { escape } from "./markup";
+import type { State } from "../../ipc-types";
+import type { Commands } from "../commands";
+import type { Dialog } from "../dialog";
+import { setText } from "../dom";
+import { escape } from "../markup";
 
 export function createSubjects(
   workspace: HTMLElement,

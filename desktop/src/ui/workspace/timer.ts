@@ -1,6 +1,6 @@
-import type { State, Status, View } from "../ipc-types";
-import type { Commands } from "./commands";
-import { setText } from "./dom";
+import type { State, Status, View } from "../../ipc-types";
+import type { Commands } from "../commands";
+import { setText } from "../dom";
 
 const finishTimeFormat = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",

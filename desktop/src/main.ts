@@ -5,13 +5,13 @@ import type { History, View } from "./ipc-types";
 import { createCommands } from "./ui/commands";
 import { createCompactLayout } from "./ui/compact-layout";
 import { createDialog } from "./ui/dialog";
-import { createHistoryView } from "./ui/history-view";
 import { createSettings } from "./ui/settings";
 import { mountShell } from "./ui/shell";
-import { createWorkspace } from "./ui/workspace";
+import { createHistoryView } from "./ui/workspace/history-view";
+import { createWorkspace } from "./ui/workspace/workspace";
 import { WindowLayout } from "./window-layout";
 
-export { formatTime } from "./ui/timer";
+export { formatTime } from "./ui/workspace/timer";
 
 let view: View = {
   snapshot: null,

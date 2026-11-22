@@ -39,17 +39,18 @@ beberapa klien. Kedua mode menyimpan data melalui SQLite.
 │   │   ├── style.css               # Tema dan layout antarmuka
 │   │   └── ui/
 │   │       ├── shell.ts            # Header, banner, profil, dan tema
-│   │       ├── workspace.ts        # Render panel timer, pilihan mode, dan aksi istirahat
-│   │       ├── workspace-markup.ts # Struktur HTML panel timer
-│   │       ├── timer.ts            # Countdown, input durasi Manual, dan pintasan Space
-│   │       ├── subjects.ts         # Pemilihan, penambahan, dan penghapusan subjek
 │   │       ├── settings.ts         # Preferensi, koneksi Server, dan setup Local
 │   │       ├── dialog.ts           # Dialog bersama, fokus, dan pesan validasi
 │   │       ├── commands.ts         # Pengiriman perintah dan status pending
 │   │       ├── compact-layout.ts   # Transisi full/compact dan ukuran Details
-│   │       ├── history-view.ts     # Panel riwayat, tab, dan pratinjau compact
 │   │       ├── dom.ts              # Pembaruan teks dan markup DOM
-│   │       └── markup.ts           # Ikon dan escaping teks untuk HTML
+│   │       ├── markup.ts           # Ikon dan escaping teks untuk HTML
+│   │       └── workspace/
+│   │           ├── workspace.ts        # Render panel timer, pilihan mode, dan aksi istirahat
+│   │           ├── workspace-markup.ts # Struktur HTML panel timer
+│   │           ├── timer.ts            # Countdown, input durasi Manual, dan pintasan Space
+│   │           ├── subjects.ts         # Pemilihan, penambahan, dan penghapusan subjek
+│   │           └── history-view.ts     # Panel riwayat, tab, dan pratinjau compact
 │   ├── src-tauri/
 │   │   ├── src/
 │   │   │   ├── main.rs             # IPC, backend Local/Server, tray, dan siklus aplikasi
@@ -93,8 +94,12 @@ beberapa klien. Kedua mode menyimpan data melalui SQLite.
 
 `main.ts` menerima snapshot melalui Tauri dan mengoordinasikan pembaruan UI
 serta pemuatan riwayat. Modul di `ui/` mengelola DOM, event handler, dan state
-sementara masing-masing fitur. `compact-layout.ts` menggunakan `window-layout.ts`
-untuk mengubah ukuran dan posisi jendela Windows.
+sementara masing-masing fitur. `ui/workspace/` memuat template panel timer dan
+modul yang mengelola kontrol timer, subjek, dan tampilan riwayat dalam panel itu.
+Dialog, pengiriman perintah, dan utilitas DOM serta markup digunakan lintas fitur
+dan berada langsung di `ui/`. `compact-layout.ts` mengatur layout shell dan
+workspace, serta menggunakan `window-layout.ts` untuk mengubah ukuran dan posisi
+jendela Windows.
 
 Pembagian tanggung jawab runtime, aturan timer, dan protokol sinkronisasi
 dijelaskan di [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md). Perintah untuk

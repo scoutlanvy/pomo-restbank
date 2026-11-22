@@ -1,9 +1,9 @@
-import type { State, Status, View } from "../ipc-types";
-import { pendingFeedbackMarkup, type Commands } from "./commands";
-import type { CompactLayout } from "./compact-layout";
-import type { Dialog } from "./dialog";
-import { setMarkup, setText } from "./dom";
-import { icon } from "./markup";
+import type { State, Status, View } from "../../ipc-types";
+import { pendingFeedbackMarkup, type Commands } from "../commands";
+import type { CompactLayout } from "../compact-layout";
+import type { Dialog } from "../dialog";
+import { setMarkup, setText } from "../dom";
+import { icon } from "../markup";
 import { createSubjects } from "./subjects";
 import { createTimer, formatTime } from "./timer";
 import { workspaceMarkup } from "./workspace-markup";

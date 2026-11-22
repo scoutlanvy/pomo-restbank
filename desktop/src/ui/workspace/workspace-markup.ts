@@ -1,4 +1,4 @@
-import { icon } from "./markup";
+import { icon } from "../markup";
 
 export function workspaceMarkup(
   manual: readonly number[],
