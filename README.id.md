@@ -13,10 +13,11 @@ Jalankan dari root proyek:
 ```powershell
 npm.cmd --prefix desktop ci
 npm.cmd --prefix desktop run release
-.\dist\v0.3.0\PomoRestbank-Launcher.exe
+Expand-Archive .\dist\v0.3.0\Pomo-Restbank-0.3.0-portable.zip .\dist\v0.3.0\portable -Force
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe
 ```
 
-Build menghasilkan aplikasi, launcher Rust, server opsional, installer NSIS, dan ZIP portable di `dist/<tag>/`, misalnya `dist/v0.3.0/`. Sesuaikan `v0.3.0` pada contoh perintah dengan tag rilis yang dipakai. Buka `pomo-restbank.exe` atau `PomoRestbank-Launcher.exe`: **mode Lokal menjadi default**, termasuk setelah memperbarui instalasi lama. Timer dan SQLite berjalan di dalam aplikasi tanpa proses server terpisah atau port jaringan. Installer yang memasang klien saja sudah cukup untuk mode Lokal; Node.js hanya diperlukan untuk build.
+Build menghasilkan tiga file di `dist/<tag>/`: `Pomo-Restbank-<versi>-setup.exe`, `Pomo-Restbank-<versi>-portable.zip`, dan `SHA256SUMS.txt`. ZIP portable berisi aplikasi, launcher Rust, server opsional, dokumentasi, dan lisensi. Ekstrak ZIP sebelum menjalankan executable portable pada contoh di bawah. Sesuaikan `v0.3.0` pada contoh perintah dengan tag rilis yang dipakai. Buka `pomo-restbank.exe` atau `PomoRestbank-Launcher.exe`: **mode Lokal menjadi default**, termasuk setelah memperbarui instalasi lama. Timer dan SQLite berjalan di dalam aplikasi tanpa proses server terpisah atau port jaringan. Installer yang memasang klien saja sudah cukup untuk mode Lokal; Node.js hanya diperlukan untuk build.
 
 Build melewati executable yang identik. Jika executable berubah dan sedang dipakai, pilih **Quit** pada aplikasi yang memakai file itu sebelum build ulang; packaging tidak menghentikan proses otomatis. Server perlu dihentikan terpisah saat mengganti executable server.
 
@@ -35,8 +36,8 @@ Pilih **Settings → Application → Connection mode → Server**, simpan, lalu 
 Untuk dua jendela mode Server, gunakan profil berbeda:
 
 ```powershell
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile first
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile second
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
 Tambahkan `--preview` untuk target fokus 10 detik dan reward 5/5/5/15 detik, dengan data tersendiri. Server normal memakai port 4317, preview port 4318. Bisa juga klik dua kali `PomoRestbank-Launcher.exe`; pengguna tidak memerlukan Node.js atau skrip PowerShell. Launcher harus berada di samping executable klien; mode Server lokal juga memerlukan executable server. Installer NSIS sudah cukup untuk Lokal; ZIP portable menyertakan launcher dan server.

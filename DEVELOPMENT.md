@@ -39,3 +39,5 @@ Versi About pada `run dev` mengikuti tag versi stabil tertinggi yang terjangkau 
 
 
 Release memakai cache Temp tetap per repository: `pomo-restbank-release-cache-<hash>`. Override opsional: `CARGO_TARGET_DIR`. Hasil default masuk `dist/<tag>/`; argumen output eksplisit dipakai persis tanpa subfolder tambahan. Jangan jalankan dua release bersamaan dalam checkout yang sama. Cache dan hasil versi lama tidak dihapus otomatis.
+
+Hasil release hanya installer `Pomo-Restbank-<versi>-setup.exe`, ZIP `Pomo-Restbank-<versi>-portable.zip`, dan `SHA256SUMS.txt` (checksum installer dan ZIP). Executable lepas serta dokumentasi dikemas dari staging di cache build ke ZIP. Build ulang membersihkan file keluaran layout lama untuk versi yang sama; file lain dan folder versi lain tetap dipertahankan.

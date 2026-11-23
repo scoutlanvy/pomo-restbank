@@ -19,10 +19,11 @@ From the repository root:
 ```powershell
 npm.cmd --prefix desktop ci
 npm.cmd --prefix desktop run release
-.\dist\v0.3.0\PomoRestbank-Launcher.exe
+Expand-Archive .\dist\v0.3.0\Pomo-Restbank-0.3.0-portable.zip .\dist\v0.3.0\portable -Force
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe
 ```
 
-The build creates the desktop application, Rust launcher, optional server, NSIS installer, and portable ZIP in `dist/<tag>/` (for example `dist/v0.3.0/`). Replace `v0.3.0` in the commands below with your release tag. Open `pomo-restbank.exe` or `PomoRestbank-Launcher.exe`: **Local mode is the default**, including after upgrading an older installation. It runs the timer and SQLite in the desktop process without a separate server or network port. The client-only installer is sufficient for Local mode; Node.js is needed only for building.
+The build creates three files in `dist/<tag>/`: `Pomo-Restbank-<version>-setup.exe`, `Pomo-Restbank-<version>-portable.zip`, and `SHA256SUMS.txt`. The portable ZIP contains the application, Rust launcher, optional server, documentation, and license. Extract the ZIP before running the portable executables shown below. Replace `v0.3.0` in the commands below with your release tag. Open `pomo-restbank.exe` or `PomoRestbank-Launcher.exe`: **Local mode is the default**, including after upgrading an older installation. It runs the timer and SQLite in the desktop process without a separate server or network port. The client-only installer is sufficient for Local mode; Node.js is needed only for building.
 
 Identical executables are left in place. If a changed executable is in use, choose **Quit** on the exact application and rerun the build; packaging never stops processes automatically. A server process must be stopped separately when replacing its executable.
 
@@ -41,15 +42,15 @@ Choose **Settings → Application → Connection mode → Server**, save, then *
 For two clients on this computer:
 
 ```powershell
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile first
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --profile second
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --profile first
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --profile second
 ```
 
 For two preview Server clients with separate data (use only `--preview` for one Local preview window):
 
 ```powershell
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --preview --profile first
-.\dist\v0.3.0\PomoRestbank-Launcher.exe --backend server --preview --profile second
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --preview --profile first
+.\dist\v0.3.0\portable\PomoRestbank-Launcher.exe --backend server --preview --profile second
 ```
 
 You can also start the executables yourself:
